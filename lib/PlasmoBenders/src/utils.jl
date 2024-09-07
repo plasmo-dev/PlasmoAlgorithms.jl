@@ -102,7 +102,7 @@ function _add_slack_to_node(optimizer::BendersOptimizer, next_object, node::Plas
     @objective(node, Min, obj_func)
 end
 
-function _add_slack_to_node_for_links(node::Plasmo.OptiNode, num_links, slack_penalty)
+function _add_slack_to_node_for_links(optimizer::BendersOptimizer, next_object::Plasmo.OptiGraph, node::Plasmo.OptiNode, num_links, slack_penalty)
     # Define slack variables
     @variable(node, _slack_up_link[1:num_links] >= 0)
     @variable(node, _slack_down_link[1:num_links] >= 0)

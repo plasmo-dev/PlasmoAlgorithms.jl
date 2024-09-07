@@ -241,8 +241,13 @@ function _add_complicating_variables!(
 
             # Get the variables from the constraint in the next_object
             next_object_link_vars = intersect(next_object_vars, vars)
+            last_object_link_vars = intersect(last_object_vars, vars)
+            next_object_copy_vars = [var_copy_map[var] for var in last_object_link_vars]
+
             # Get the set of nodes in the next_object that are included in the constraint
-            next_optinodes = unique(JuMP.owner_model.(next_object_link_vars))
+            var_copy_optinodes = JuMP.owner_model.(next_object_copy_vars)
+            next_object_optinodes = JuMP.owner_model.(next_object_link_vars)
+            next_optinodes = unique(union(var_copy_optinodes, next_object_optinodes))
 
             # Get the first optinode in the set
             next_optinode = next_optinodes[1]
