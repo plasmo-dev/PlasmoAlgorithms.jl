@@ -1,5 +1,5 @@
 using Revise
-using Plasmo, JuMP, HiGHS, Plots, PlasmoDecompositions
+using Plasmo, JuMP, HiGHS, Plots, PlasmoBenders
 
 g = OptiGraph()
 set_optimizer(g, HiGHS.Optimizer)
@@ -15,12 +15,10 @@ set_optimizer(g, HiGHS.Optimizer)
 set_optimizer(nodes[1], optimizer_with_attributes(HiGHS.Optimizer, "output_flag" => false))
 set_optimizer(nodes[2], optimizer_with_attributes(HiGHS.Optimizer, "output_flag" => false))
 
-
-
 solver = optimizer_with_attributes(HiGHS.Optimizer, "output_flag" => false)
 
-DDPOpt = DDPOptimizer(g, nodes[1]; max_iters = 30, add_slacks = true, fix_slacks = true, relaxed_init_cuts = false, solver = solver)
+BendersOpt = BendersOptimizer(g, nodes[1]; max_iters = 30, add_slacks = true, fix_slacks = true, relaxed_init_cuts = false, solver = solver)
 
 t2 = @elapsed begin
-    optimize!(DDPOpt)
+    optimize!(BendersOpt)
 end

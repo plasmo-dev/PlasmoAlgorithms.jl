@@ -147,7 +147,7 @@ function _update_objective_and_optimize(optimizer, next_object)
     optimize!(next_object)
 
     # Save the data from the new solution
-    new_phi_LR = objective_value(next_object) - _extra_objective_value(optimizer, next_object)
+    new_phi_LR = objective_value(next_object)
     push!(optimizer.phis_LR[next_object], new_phi_LR)
 
     # Reset objective
@@ -211,7 +211,7 @@ function _optimize_in_forward_pass!(optimizer, i, ub)
             dual_iters = optimizer.dual_iters[next_object]
             optimizer.dual_iters[next_object] = hcat(dual_iters, next_duals)
 
-            next_phi = JuMP.objective_value(next_object) - _extra_objective_value(optimizer, next_object)
+            next_phi = JuMP.objective_value(next_object)
             push!(optimizer.phis[next_object], next_phi)
         end
 
@@ -267,7 +267,7 @@ function _optimize_in_backward_pass(optimizer, i)
         dual_iters = optimizer.dual_iters[object]
         next_duals = _get_next_duals(optimizer, object)
 
-        next_phi = JuMP.value(object, JuMP.objective_function(object)) - _extra_objective_value(optimizer, object)
+        next_phi = JuMP.value(object, JuMP.objective_function(object))
 
         optimizer.dual_iters[object] = hcat(dual_iters, next_duals)
         push!(optimizer.phis[object], next_phi)
@@ -480,7 +480,7 @@ end
 
 function _add_to_upper_bound!(optimizer::BendersOptimizer, object::OptiGraph, ub)
     obj_val = JuMP.value(object, JuMP.objective_function(object))
-    ub[1] += obj_val - _extra_objective_value(optimizer, object)
+    ub[1] += obj_val
     if length(optimizer.solve_order_dict[object]) > 0
         theta_val = _theta_value(optimizer, object)
         ub[1] -= theta_val

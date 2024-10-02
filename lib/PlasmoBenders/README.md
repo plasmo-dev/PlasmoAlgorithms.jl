@@ -71,7 +71,7 @@ The `BendersOptimizer` constructor takes the overall graph, `g0` as the first ob
 
 PlasmoBenders includes additional functionality. The following keyword arguments can be passed to the `BendersOptimizer` constructor. These include the following key word arguments: 
 
- * `max_iter` - maximum number of iterations to use
+ * `max_iters` - maximum number of iterations to use
  * `tol` - termination tolerance between upper and lower bounds
  * `solver` - the solver to use for the subproblems (the user can set these outside the constructor and not pass any `solver` object)
  * `strengthened` - whether to use [strengthened Benders cuts](https://link.springer.com/article/10.1007/s10107-018-1249-5) (for MIPs)

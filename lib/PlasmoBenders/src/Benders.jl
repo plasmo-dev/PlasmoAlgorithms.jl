@@ -627,7 +627,7 @@ function _forward_pass!(optimizer::BendersOptimizer)
     lb = [0.]
 
     # Add objective (minus cost-to-go) to the upper bound value
-    lb[1] += root_objective - _extra_objective_value(optimizer, root_object)
+    lb[1] += root_objective
     if get_regularize(optimizer)
         get_regularize_lbs(optimizer)[root_object] = lb[1]
 

@@ -16,15 +16,6 @@ function _get_theta(optimizer::BendersOptimizer, object::Plasmo.OptiGraph, idx::
     return optimizer.ext["theta_vars"][object][idx]
 end
 
-function _extra_objective_value(optimizer::BendersOptimizer, object::Plasmo.OptiGraph)
-    if optimizer.ext["is_overlapped"]
-        extra_objective = optimizer.ext["extra_objective"][object]
-        return value(object, extra_objective)
-    else
-        return 0
-    end
-end
-
 # Define a function for getting the dual value of the linking constraints
 function _get_next_duals(optimizer::BendersOptimizer, next_object::Plasmo.OptiGraph)
     var_copy_map = optimizer.var_copy_map[next_object]
@@ -154,11 +145,6 @@ function _set_is_MIP(optimizer::BendersOptimizer)
     end
     optimizer.is_MIP = false
     return nothing
-end
-
-# Define a function for getting all objects (nodes or graphs) on the optimizer
-function _get_objects(optimizer::BendersOptimizer{Plasmo.OptiNode})
-    return all_nodes(optimizer.graph)
 end
 
 function _get_objects(optimizer::BendersOptimizer{Plasmo.OptiGraph})
