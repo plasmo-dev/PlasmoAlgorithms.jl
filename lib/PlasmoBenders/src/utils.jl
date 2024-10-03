@@ -61,6 +61,32 @@ function JuMP.value(optimizer::BendersOptimizer, var::NodeVariableRef)
     return var_value
 end
 
+function JuMP.objective_value(optimizer::BendersOptimizer)
+    if optimizer.current_iter == 0
+        error("Optimize has not been called")
+    end
+    return optimizer.best_upper_bound
+end
+
+function JuMP.dual_objective_value(optimizer::BendersOptimizer)
+    if optimizer.current_iter == 0
+        error("Optimize has not been called")
+    end
+    return optimizer.lower_bounds[end]
+end
+
+function absolute_gap(optimizer::BendersOptimizer)
+    if optimizer.current_iter == 0
+        error("Optimize has not been called")
+    end
+    lb = optimizer.lower_bounds[end]
+    ub = optimizer.best_upper_bound
+
+    gap = abs((ub - lb)/ub)
+
+    return gap
+end
+
 # Define function for warm starting
 function _warm_start(optimizer::BendersOptimizer, object)
     all_vars = all_variables(object)
