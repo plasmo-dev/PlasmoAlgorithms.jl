@@ -44,6 +44,12 @@ function JuMP.value(
     return var_value
 end
 
+"""
+    JuMP.value(opt::BendersOptimizer, var::NodeVariableRef)
+    
+Returns the value of `var` from the BendersOptimizer object. The value corresponds to the
+best upper bound of the optimizer.
+"""
 function JuMP.value(optimizer::BendersOptimizer, var::NodeVariableRef)
     best_solutions = optimizer.best_solutions
     var_solution_map = optimizer.var_solution_map
@@ -61,14 +67,20 @@ function JuMP.value(optimizer::BendersOptimizer, var::NodeVariableRef)
     return var_value
 end
 
-function JuMP.value(optimizer::BendersOptimizer, var_vec::Vector{NodeVariableRef})
+"""
+    JuMP.value(opt::BendersOptimizer, vars::Vector{NodeVariableRef})
+    
+Returns a vector of variables contained in the `vars` vector from the BendersOptimizer
+object. The values correspond to the best upper bound of the optimizer.
+"""
+function JuMP.value(optimizer::BendersOptimizer, vars::Vector{NodeVariableRef})
     best_solutions = optimizer.best_solutions
     var_solution_map = optimizer.var_solution_map
     var_to_graph_map = optimizer.var_to_graph_map
 
-    value_vector = Vector{Float64}(undef, length(var_vec))
+    value_vector = Vector{Float64}(undef, length(vars))
 
-    for (i, var) in enumerate(var_vec)
+    for (i, var) in enumerate(vars)
         if !(var in keys(var_to_graph_map))
             error("$var is not defined in any of the subgraphs")
         end
@@ -98,7 +110,7 @@ function JuMP.dual_objective_value(optimizer::BendersOptimizer)
     return optimizer.lower_bounds[end]
 end
 
-function absolute_gap(optimizer::BendersOptimizer)
+function relative_gap(optimizer::BendersOptimizer)
     if optimizer.current_iter == 0
         error("Optimize has not been called")
     end

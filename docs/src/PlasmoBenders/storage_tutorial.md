@@ -1,10 +1,12 @@
-## Storage Operation
+# Storage Operation Example
 
 This example is a simple example highlighting how PlasmoBenders can be applied to solve a temporal problem using Nested Benders Decomposition (Dual Dynamic Programming).
 
+## Problem Formulation
+
 The example below is a simplified storage operation problem, where a raw material can be purchased and converted to a product and sold. The price of the product is variable, so it is most economical to store the product at times of low price and sell at times of high price. This problem can be considered a "multi-scale" problem because it is making decisions at each time point while having to consider longer-term product prices. The mathematical problem is as follows: 
 
-$$
+```math
 \begin{align*}
     \min &\; \sum_{t=1}^T c^{raw}_t u^{raw}_t - c^{sell}_t x^{sell}_t \\
     \textrm{s.t.} &\; x^{store}_{t+1} - x^{store}_t = x^{save}_t, \quad t = 1, ..., T-1\\
@@ -14,9 +16,11 @@ $$
     &\; \underline{d}^{save} \le x^{save}_t \le \overline{d}^{save}, \quad t = 1, ..., T \\
     &\; x^{store}_1 = \bar{x}^{store}
 \end{align*}
-$$
+```
 
 Here, $\underline{d}$ and $\overline{d}$ are the upper and lower bounds on their respective variables, $x^{store}_t$ is the amount of product in storage at time $t$, $x^{save}_t$ is the amount of product sent to storage (can be negative), $x^{sell}_t$ is the amount of product sold, $u^{raw}_t$ is the amount of raw material purchased, $c^{sell}_t$ is the price for product at time $t$, $c^{raw}$ is the (constant) cost of raw material purchased, and $\alpha$ is a conversion factor from raw material to product. The first constraint is a mass balance on the storage, so that $x^{save}_t$ represents the change in storage at time $t$. The second constraint is a mass balance on product at time $t$, which ensures that any product generated ($\alpha u^{raw}_t$) must either be sold or sent to storage. 
+
+## Modeling the Problem with Plasmo
 
 This problem can be modeled as a linear graph using Plasmo. We will represent each time point as a node in the graph, with $T = 20$ total nodes.  The code for building this problem is shown below: 
 
@@ -51,8 +55,7 @@ end
 ```
 The above problem results in the following shape: 
 
-
-<img src="../figures/20node_graph.png" alt="20node graph" style="width: 300px;"/>
+<img src="../figures/20node_graph.png" alt="20node graph" style="width: 500px;"/>
 
 This problem is a simple LP and could be solved directly with a LP solver. However, we will solve this problem using Nested Benders Decomposition to highlight how the decomposition scheme works. We will partition this problem into four subproblems, each with five nodes. This can be done with the code below:
 
@@ -74,8 +77,9 @@ end
 
 The resulting problem can be visualized as: 
 
-<img src="../figures/20node_graph_partitioned.png" alt="20node partitioned graph" style="width: 300px;"/>
+<img src="../figures/20node_graph_partitioned.png" alt="20node partitioned graph" style="width: 500px;"/>
 
+## Solving with PlasmoBenders
 
 The subgraphs have a (linear) tree structure, so we can pass this graph to PlasmoBenders' `BendersOptimizer` constructor and solve it with Nested Benders Decomposition. This also requires setting a "root subgraph." We will set the first subgraph as the root subgraph, but any of the subgraphs could be used. 
 
@@ -88,10 +92,29 @@ BendersOptimizer(graph, root_graph, solver = solver)
 
 The Nested Benders scheme is able to reach the optimal solution after 5 iterations. The bounds and gap are shown below.
 
-<img src="../figures/storage_example_plot.png" alt="NBD_operation" style="width: 300px;"/>
+<img src="../figures/storage_example_plot.png" alt="NBD_operation" style="width: 400px;"/>
 
-Show how to query the solution
+Note that the first iteration returns an upper bound that is well above the optimal. The first iteration of the solve is performing a "receding-horizon" approach, where each subgraph is solved in series and the optimal solution passed to the next subgraph. This results in a sub optimal solution since each problem is not "seeing" the future prices of the product. The cutting planes that are formed after each iteration essentially help provide the previous subgraphs with knowledge of how their solution impacts the solution of future subproblems, which results in the upper bound eventually converging to the true solution. 
 
-Note that you could use a different number of iterations
+## Querying Solutions
 
-Note that the different solution at the first iteration comes from not seeing far enough ahead
+PlasmoBenders provides access to API functions for querying the optimal solution from the BendersOptimizer object. We can query the solution by calling 
+```julia
+JuMP.objective_value(benders_opt)
+```
+which returns the best upper bound. We can query the lower bound by calling
+```julia
+JuMP.dual_objective_value(benders_opt)
+```
+This lower bound can be less than the upper bound for MIP problems since there can be a duality gap. We can also query the relative gap by calling
+```julia
+relative_gap(benders_opt)
+```
+Individual variable values can be retrieved by calling
+```julia
+JuMP.value(benders_opt, graph[:nodes][1][:x_sell])
+```
+In addition, `JuMP.value` has been extended to also take a vector of variables rather than just a single variable, so we can also call
+```julia
+JuMP.value(benders_opt, all_variables(graph))
+```
