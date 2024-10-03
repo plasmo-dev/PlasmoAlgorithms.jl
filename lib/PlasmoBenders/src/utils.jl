@@ -61,6 +61,29 @@ function JuMP.value(optimizer::BendersOptimizer, var::NodeVariableRef)
     return var_value
 end
 
+function JuMP.value(optimizer::BendersOptimizer, var_vec::Vector{NodeVariableRef})
+    best_solutions = optimizer.best_solutions
+    var_solution_map = optimizer.var_solution_map
+    var_to_graph_map = optimizer.var_to_graph_map
+
+    value_vector = Vector{Float64}(undef, length(var_vec))
+
+    for (i, var) in enumerate(var_vec)
+        if !(var in keys(var_to_graph_map))
+            error("$var is not defined in any of the subgraphs")
+        end
+        owning_object = var_to_graph_map[var]
+        object_sols = best_solutions[owning_object]
+        var_idx = var_solution_map[owning_object][var]
+
+        var_value = object_sols[var_idx]
+
+        value_vector[i] = var_value
+    end
+
+    return value_vector
+end
+
 function JuMP.objective_value(optimizer::BendersOptimizer)
     if optimizer.current_iter == 0
         error("Optimize has not been called")
