@@ -136,6 +136,7 @@ DDP subproblems to the data described)
  - `integer_map` - dictionary mapping the nodes to a vector of integer variables on the node
  - `last_solutions` - dictionary mapping the nodes to a vector of the last solutions
  - `var_solution_map` - dictionary mapping the variables to their index on the `last_solutions` vector
+ - `var_to_graph_map` - dictionary mapping the variables to their owning subproblem subgraph
  - `options` - solver options for DDP algorithm
  - `ext` - Dictionary for extending certain procedures
 """
@@ -179,6 +180,7 @@ mutable struct BendersOptimizer{T} <: AbstractPBOptimizer{T}
 
     last_solutions::Dict{T, Vector{Float64}}
     var_solution_map::Dict{T, Dict{NodeVariableRef, Int}}
+    var_to_graph_map::Dict{NodeVariableRef, T}
     best_solutions::Dict{T, Vector{Float64}}
     best_upper_bound::Float64
 
@@ -228,6 +230,7 @@ mutable struct BendersOptimizer{T} <: AbstractPBOptimizer{T}
 
         optimizer.last_solutions = Dict{T, Vector{Float64}}()
         optimizer.var_solution_map = Dict{T, Dict{NodeVariableRef, Int}}()
+        optimizer.var_to_graph_map = Dict{NodeVariableRef, Int}()
         optimizer.best_solutions = Dict{T, Vector{Float64}}()
         optimizer.best_upper_bound = Inf
 
@@ -428,6 +431,7 @@ function BendersOptimizer(
         end
 
         var_solution_map = optimizer.var_solution_map
+        var_to_graph_map = optimizer.var_to_graph_map
         # Create mapping of binary and integer variables on each node
         for (i, object) in enumerate(optimizer.solve_order)
             object_var_solution_map = Dict{NodeVariableRef, Int}()
@@ -442,6 +446,7 @@ function BendersOptimizer(
                     int_value_dict[var] = 0
                 end
                 object_var_solution_map[var] = j
+                var_to_graph_map[var] = object
             end
 
             optimizer.var_solution_map[object] = object_var_solution_map

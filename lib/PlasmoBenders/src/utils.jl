@@ -44,6 +44,23 @@ function JuMP.value(
     return var_value
 end
 
+function JuMP.value(optimizer::BendersOptimizer, var::NodeVariableRef)
+    best_solutions = optimizer.best_solutions
+    var_solution_map = optimizer.var_solution_map
+    var_to_graph_map = optimizer.var_to_graph_map
+
+    if !(var in keys(var_to_graph_map))
+        error("$var is not defined in any of the subgraphs")
+    end
+    owning_object = var_to_graph_map[var]
+    object_sols = best_solutions[owning_object]
+    var_idx = var_solution_map[owning_object][var]
+
+    var_value = object_sols[var_idx]
+
+    return var_value
+end
+
 # Define function for warm starting
 function _warm_start(optimizer::BendersOptimizer, object)
     all_vars = all_variables(object)
