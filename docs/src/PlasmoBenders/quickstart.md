@@ -82,7 +82,7 @@ benders_opt = BendersOptimizer(g, g1, solver = solver)
 
 Here, `benders_opt` is the optimizer object. It includes several attributes, including the upper and lower bounds at each iteration, solver options, a mapping of complicating variables to their subproblems, and dual and primal information from each iteration. 
 
-Because PlasmoBenders requires a tree structure, we can actually set _any_ subgraph as the root graph. Setting `g1` as the root graph results in two stages (`g1` in stage 1 and `g2` and `g3` in stage 2), but we could instead solve this problem with three stages by setting either `g2` or `g3` as the root graph FILL THIS IN.
+Because PlasmoBenders requires a tree structure, we can actually set _any_ subgraph as the root graph. Setting `g1` as the root graph results in two stages (`g1` in stage 1 and `g2` and `g3` in stage 2), but we could instead solve this problem with three stages by setting either `g2` or `g3` as the root graph by changing the second argument in the `BendersOptimizer` function in the code above. 
 
 ## Optimizing the BendersOptimizer
 
@@ -94,13 +94,25 @@ JuMP.optimize!(benders_opt)
 
 ## Querying Solutions
 
+PlasmoBenders.jl provides API functions for querying solutions and information from the `BendersOptimizer` object. Many of these are extended from JuMP. To query the objective, value, we can use
+```julia
+JuMP.objective_value(benders_opt)
+```
+This returns the best upper bound. If PlasmoBenders has not converged to the requested tolerance, it will still return the best upper bound it has yet found. The lower bound can be queried by calling
+```julia
+JuMP.dual_objective_value(benders_opt)
+```
+This returns the value of the lower bound. In the case of MIP problems, it is possible that there is a MIP gap and that certain tolerances cannot be reached. To see the relative gap between the lower and upper bound (i.e., the absolute value of the difference between the upper and lower bounds, normalized by the upper bound), you can call
+```julia
+relative_gap(benders_opt)
+```
 
-
-
-BendersOptimizer constructor
-
-solving the constructor
-
-Note that PlasmoBenders expects a Minimization
-
-querying solutions
+In addition, there is functionality for querying the solution corresponding to the best upper bound. Individual variable values can be queried by calling
+```julia
+JuMP.value(benders_opt, var)
+```
+where `var` is the variable reference. Variables can be queried from the graph by pointing to the node and then pointing to the variable reference. For instance, we can query `x[1]` from `g1` by calling `g1[:n][:x][1]`. In addition, we note that the `JuMP.value` function can normally take a single argument of a variable, but the extension we provide requires two arguments, with the first argument specifying the `BendersOptimizer` object. To query the solutions for a vector of variables, you can call
+```julia
+JuMP.value(benders_opt, vars)
+```
+where `vars` is a vector of variables, such as `all_variables(g)`.
