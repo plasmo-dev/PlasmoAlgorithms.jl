@@ -35,13 +35,13 @@ where $\bar{x}$ is the solution of the master problem at the last iteration and 
 
 A visualization of BD for graphs is shown below. Here, the graph on the left has two subgraphs with an edge between them. One of the subgraphs can be treated as the "master" problem, and the other as the "subproblem." The cost-to-go variable is added to the master problem along with the cutting plane restrictions. The solutions of the master problem are then fixed in the subproblem. These problems are iteratively solved until a solution is reached. 
 
-<img src="../figures/benders_solution.png" alt="BD" style="width: 400px;"/>
+<img src="../figures/benders_solution.png" alt="BD" style="width: 500px;"/>
 
 
 ## Nested Benders Decomposition
 Nested Benders Decomposition (NBD) is similar to BD but includes more than two "stages" of problems. BD can be considered a "two-stage" problem where the master problem is the first stage, which is then linked to a subproblem in a "second" stage. In NBD, There can be additional subproblems, such that the subproblem in stage two can contain complicating variables for an additional subproblem in a third stage, and so forth. This can be visualized as shown below. 
 
-<img src="../figures/nested_benders_solution.png" alt="NBD" style="width: 400px;"/>
+<img src="../figures/nested_benders_solution.png" alt="NBD" style="width: 600px;"/>
 
 In NBD, there is a "forward-pass" where each stage is solved sequentially and primal solutions are shared to and fixed in the next stage. After each stage has been solved, information can be shared to the previous stage in a "backward-pass" to form cutting planes on each previous stage. 
 

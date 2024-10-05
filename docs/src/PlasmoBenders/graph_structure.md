@@ -22,7 +22,7 @@ Some structures may initially look unfit for BD or NBD, but the flexibility in s
 
 This problem can be partitioned into different subgraphs to form the required tree structure. For instance, you can see below different partitioning schemes that result in different tree structures that can then be used for PlasmoBenders. Note that the dotted lines represent new subgraphs formed by partitioning.
 
-<img src="../figures/20node_graph_partitioned.png" alt="grid graph partitioned" style="width: 500px;"/>
+<img src="../figures/grid_graph_partitioning.png" alt="grid graph partitioned" style="width: 500px;"/>
 
 
 ## Algorithm Performance
