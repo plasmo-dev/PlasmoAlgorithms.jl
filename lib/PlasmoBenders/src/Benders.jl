@@ -481,12 +481,11 @@ function BendersOptimizer(
 end
 
 """
-    JuMP.optimize!(optimizer::PB.BendersOptimizer; relaxed::Bool = true, strengthened::Bool = false)
+    JuMP.optimize!(optimizer::PB.BendersOptimizer; output::Bool = true, run_gc::Bool = false)
 
-Optimize the graph in BendersOptimizer by using the DDP algorithm. Keyword argument `strengthened`
-is a Boolean indicating whether to use strengthened cuts from the work of Zou et al., 2019
-https://doi.org/10.1007/s10107-018-1249-5. Only useful when there are integer variables in second stage.
-Keyword argument `output` indicates whether to print information at each iteration.
+Optimize the graph in BendersOptimizer by using the DDP algorithm. Keyword argument `output`
+indicates whether to print the upper/lower bounds and gap and each iteraiton. `run_gc` indicates
+whether to run the garbage collector after each iteraiton. 
 """
 function JuMP.optimize!(
     optimizer::BendersOptimizer;
