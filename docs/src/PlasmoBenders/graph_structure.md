@@ -12,18 +12,16 @@ It is possible that a user may want to use nodes as subproblems instead of subgr
 
 Both BD and NBD require the subgraphs to form a tree structure. This means that there are no cycles among the subgraphs. In other words, if you start at any subgraph $i$ and move along the edges of the graph to any other subgraph $j$, you cannot return to subgraph $i$ without traversing the same subgraphs as you did to reach subgraph $j$. PlasmoBenders, in constructing the `BendersOptimizer` object, will check structure and error out if the structure is not correct. The root subgraph specified by the user serves as a "starting point" for the graph structure, and each subgraph will then be placed into stages, with the root subgraph as the first stage. The second stage is all subgraphs connected by an edge to the root subgraph, the third stage is all subgraphs connected to subgraphs in stage two that does not include previous stages, and so forth. BD is a specific case of NBD where there are only two stages. These structures can be visualized as below, where the nodes aligned vertically can be considered in the same stage: 
 
-<img src="../figures/graph_structure.png" alt="graph_structure" style="width: 500px;"/>
-
+![graph_structure](../figures/graph_structure.png)
 ## Building the Graph Structure
 
 Some structures may initially look unfit for BD or NBD, but the flexibility in structuring and partitioning graphs provided by Plasmo can create the required structures. For instance, consider the following graph, where each "node" here can be considered its own subgraph.
 
-<img src="../figures/grid_graph.png" alt="grid graph" style="width: 500px;"/>
+![grid graph](../figures/grid_graph.png)
 
 This problem can be partitioned into different subgraphs to form the required tree structure. For instance, you can see below different partitioning schemes that result in different tree structures that can then be used for PlasmoBenders. Note that the dotted lines represent new subgraphs formed by partitioning.
 
-<img src="../figures/grid_graph_partitioning.png" alt="grid graph partitioned" style="width: 500px;"/>
-
+![grid graph partitioned](../figures/grid_graph_partitioning.png)
 
 ## Algorithm Performance
 

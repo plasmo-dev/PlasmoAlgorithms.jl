@@ -55,7 +55,7 @@ end
 ```
 The above problem results in the following shape: 
 
-<img src="../figures/20node_graph.png" alt="20node graph" style="width: 500px;"/>
+![20node graph](../figures/20node_graph.png)
 
 This problem is a simple LP and could be solved directly with a LP solver. However, we will solve this problem using Nested Benders Decomposition to highlight how the decomposition scheme works. We will partition this problem into four subproblems, each with five nodes. This can be done with the code below:
 
@@ -77,7 +77,7 @@ end
 
 The resulting problem can be visualized as: 
 
-<img src="../figures/20node_graph_partitioned.png" alt="20node partitioned graph" style="width: 500px;"/>
+![20node partitioned graph](../figures/20node_graph_partitioned.png)
 
 ## Solving with PlasmoBenders
 
@@ -92,7 +92,7 @@ BendersOptimizer(graph, root_graph, solver = solver)
 
 The Nested Benders scheme is able to reach the optimal solution after 5 iterations. The bounds and gap are shown below.
 
-<img src="../figures/storage_example_plot.png" alt="NBD_operation" style="width: 400px;"/>
+![NBD_operation](../figures/storage_example_plot.png)
 
 Note that the first iteration returns an upper bound that is well above the optimal. The first iteration of the solve is performing a "receding-horizon" approach, where each subgraph is solved in series and the optimal solution passed to the next subgraph. This results in a sub optimal solution since each problem is not "seeing" the future prices of the product. The cutting planes that are formed after each iteration essentially help provide the previous subgraphs with knowledge of how their solution impacts the solution of future subproblems, which results in the upper bound eventually converging to the true solution. 
 

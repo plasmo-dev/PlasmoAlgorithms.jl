@@ -2,11 +2,11 @@
 #  This Source Code Form is subject to the terms of the MIT License
 #  This source code is adapted from that of Plasmo.jl which can be found at https://github.com/plasmo-dev/Plasmo.jl/blob/main/docs/make.jl
 
-using Documenter, Plasmo, Suppressor, Graphs
+using Documenter, Plasmo, Suppressor, Graphs, PlasmoBenders
 # using PlasmoPlots
 
 DocMeta.setdocmeta!(Plasmo, :DocTestSetup, :(using Plasmo); recursive=true)
-DocMeta.setdocmeta!(PlasmoAlgorithms, :DocTestSetup, :(using PlasmoAlgorithms); recursive=true)
+DocMeta.setdocmeta!(PlasmoBenders, :DocTestSetup, :(using PlasmoBenders); recursive=true)
 
 makedocs(;
     sitename="PlasmoAlgorithms.jl",
@@ -25,7 +25,8 @@ makedocs(;
             "Exploiting Graph Structure" => "PlasmoBenders/graph_structure.md",
             "API Documentation" => "PlasmoBenders/api_docs.md",
             "Tutorials" => [
-                "Storage Operation" => "PlasmoBenders/storage_tutorial.md"
+                "Storage Operation" => "PlasmoBenders/storage_tutorial.md",
+                "Equipment Sizing" => "PlasmoBenders/sizing_tutorial.md"
             ],
         ]
     ],

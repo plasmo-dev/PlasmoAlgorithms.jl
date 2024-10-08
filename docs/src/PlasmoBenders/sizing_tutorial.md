@@ -43,7 +43,7 @@ demand1 = sin.(x .* 2 .* pi ./ 15 ) .* 30 .+ 100 .+ rand(Uniform(-1,1),31) .* 5
 
 The resulting data can be visualized as shown below: 
 
-<img src="../figures/cost_demand_curve.png" alt="cost and demand" style="width: 500px;"/>
+![cost and demand](../figures/cost_demand_curve.png)
 
 Next, we will define the root (planning-level) graph. We add a node to this graph that will contain the storage unit and reactor sizing variables.
 
@@ -168,7 +168,7 @@ optimize!(benders_opt)
 
 The upper and lower bounds and the gap from the BD algorithm are shown below. 
 
-<img src="../figures/sizing_example_plot.png" alt="sizing results" style="width: 500px;"/>
+![sizing results](../figures/sizing_example_plot.png)
 
 Here, the upper and lower bounds converge after 5 iterations. 
 
