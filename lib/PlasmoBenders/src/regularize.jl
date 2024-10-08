@@ -83,7 +83,7 @@ function _regularize_pass!(
                 dual_iters = optimizer.dual_iters[object]
                 optimizer.dual_iters[object] = hcat(dual_iters, next_duals)
 
-                next_phi = JuMP.objective_value(object) - _extra_objective_value(optimizer, object)
+                next_phi = JuMP.objective_value(object)
                 push!(optimizer.phis[object], next_phi)
             end
         end
@@ -107,9 +107,13 @@ function _regularize_pass!(
             dual_iters = optimizer.dual_iters[object]
             optimizer.dual_iters[object] = hcat(dual_iters, next_duals)
 
-            next_phi = JuMP.objective_value(object) - _extra_objective_value(optimizer, object)
+            next_phi = JuMP.objective_value(object)
             push!(optimizer.phis[object], next_phi)
         end
+
+        # Save the solutions
+        object_vars = JuMP.all_variables(object)
+        optimizer.last_solutions[object] = JuMP.value.(object_vars)
     end
 end
 

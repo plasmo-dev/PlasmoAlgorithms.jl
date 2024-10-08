@@ -1,4 +1,4 @@
-# Storage Operation Example
+# Storage Operation
 
 This example is a simple example highlighting how PlasmoBenders can be applied to solve a temporal problem using Nested Benders Decomposition (Dual Dynamic Programming).
 

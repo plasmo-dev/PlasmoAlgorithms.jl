@@ -116,3 +116,6 @@ where `var` is the variable reference. Variables can be queried from the graph b
 JuMP.value(benders_opt, vars)
 ```
 where `vars` is a vector of variables, such as `all_variables(g)`.
+
+!!! note
+    PlasmoBenders currently does not create a copy of the graph that is passed to the optimizer. This means that the user is discouraged from building the `BendersOptimizer` object and then altering the problem structure. In addition, if a user creates the `BendersOptimizer` object and then tries to optimize the graph or add to the graph, it may have unexpected solutions because of the addition of the cost-to-go variables and additional linking constraints. If the graph needs to be altered and the `BendersOptimizer` re-solved, it is recommended that the original graph be recreated and a new `BendersOptimizer` object built. 
