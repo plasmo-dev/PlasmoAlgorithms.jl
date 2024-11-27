@@ -642,7 +642,7 @@ function _forward_pass!(optimizer::BendersOptimizer)
         next_objects = optimizer.solve_order_dict[root_object]
         for object in next_objects
             next_comp_vars = optimizer.comp_vars[object]
-            last_primals = JuMP.value.(next_comp_vars)
+            last_primals = [JuMP.value(root_object, var) for var in next_comp_vars]
 
             primal_iters = optimizer.primal_iters[object]
             optimizer.primal_iters[object] = hcat(primal_iters, last_primals)
@@ -650,7 +650,7 @@ function _forward_pass!(optimizer::BendersOptimizer)
 
         # Save the solutions
         next_object_vars = JuMP.all_variables(root_object)
-        optimizer.last_solutions[root_object] = JuMP.value.(next_object_vars)
+        optimizer.last_solutions[root_object] = [JuMP.value(root_object, var) for var in next_object_vars]
     end
 
     ############# Solve each successive object #################

@@ -200,7 +200,7 @@ function _optimize_in_forward_pass!(optimizer, i, ub)
         next_objects = optimizer.solve_order_dict[next_object]
         for object in next_objects
             next_comp_vars = optimizer.comp_vars[object]
-            last_primals = JuMP.value.(next_comp_vars)
+            last_primals = [JuMP.value(next_object, var) for var in next_comp_vars]
 
             primal_iters = optimizer.primal_iters[object]
             optimizer.primal_iters[object] = hcat(primal_iters, last_primals)
@@ -217,7 +217,7 @@ function _optimize_in_forward_pass!(optimizer, i, ub)
 
         # Save the solutions
         next_object_vars = JuMP.all_variables(next_object)
-        optimizer.last_solutions[next_object] = JuMP.value.(next_object_vars)
+        optimizer.last_solutions[next_object] = [JuMP.value(next_object, var) for var in next_object_vars]
     end
 
     _check_fixed_slacks!(optimizer, next_object)
