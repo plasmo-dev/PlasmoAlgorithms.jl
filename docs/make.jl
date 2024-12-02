@@ -3,14 +3,13 @@
 #  This source code is adapted from that of Plasmo.jl which can be found at https://github.com/plasmo-dev/Plasmo.jl/blob/main/docs/make.jl
 
 using Documenter, Plasmo, Suppressor, Graphs, PlasmoBenders
-# using PlasmoPlots
 
 DocMeta.setdocmeta!(Plasmo, :DocTestSetup, :(using Plasmo); recursive=true)
 DocMeta.setdocmeta!(PlasmoBenders, :DocTestSetup, :(using PlasmoBenders); recursive=true)
 
 makedocs(;
     sitename="PlasmoAlgorithms.jl",
-    modules=[PlasmoBenders], #, PlasmoPlots],
+    modules=[PlasmoBenders],
     doctest=true,
     checkdocs=:export,
     format=Documenter.HTML(; prettyurls=get(ENV, "CI", nothing) == "true"),
