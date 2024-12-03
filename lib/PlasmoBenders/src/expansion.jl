@@ -3,7 +3,7 @@
 
 """
 function expand_solve_order_objects!(
-    optimizer::BendersOptimizer{Plasmo.OptiGraph},
+    optimizer::BendersAlgorithm{Plasmo.OptiGraph},
     expansion_set::Vector{Vector{Plasmo.OptiNode}}
 )
     if length(expansion_set) != length(optimizer.solve_order)

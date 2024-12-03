@@ -1,7 +1,7 @@
 """
-    AbstractPBOptimizer{T}
+    AbstractPBAlgorithm{T}
 """
-abstract type AbstractPBOptimizer{T} end
+abstract type AbstractPBAlgorithm{T} end
 
 abstract type AbstractPBOptions end
 
@@ -96,7 +96,7 @@ mutable struct RegularizeData{T} <: PBData{T}
 end
 
 """
-    BendersOptimizer
+    BendersAlgorithm
 
 Optimizer object for dual dynamic programming with graphs. Currently only implemented for linear tree structures.
 
@@ -140,7 +140,7 @@ DDP subproblems to the data described)
  - `options` - solver options for DDP algorithm
  - `ext` - Dictionary for extending certain procedures
 """
-mutable struct BendersOptimizer{T} <: AbstractPBOptimizer{T}
+mutable struct BendersAlgorithm{T} <: AbstractPBAlgorithm{T}
     graph::Plasmo.OptiGraph
     root_object::T
 
@@ -188,7 +188,7 @@ mutable struct BendersOptimizer{T} <: AbstractPBOptimizer{T}
 
     ext::Dict
 
-    function BendersOptimizer{T}() where {T <: Plasmo.OptiGraph}
+    function BendersAlgorithm{T}() where {T <: Plasmo.OptiGraph}
         optimizer = new{T}()
 
         optimizer.graph = Plasmo.OptiGraph()
@@ -242,12 +242,12 @@ mutable struct BendersOptimizer{T} <: AbstractPBOptimizer{T}
     end
 end
 
-BendersOptimizer() = BendersOptimizer{Plasmo.OptiGraph}()
+BendersAlgorithm() = BendersAlgorithm{Plasmo.OptiGraph}()
 
 """
-    BendersOptimizer(graph, root_object; kwargs...)
+    BendersAlgorithm(graph, root_object; kwargs...)
 
-Function for creating the BendersOptimizer object from `graph`. `root_object` must be an
+Function for creating the BendersAlgorithm object from `graph`. `root_object` must be an
 OptiNode or subgraph on `graph`. key ward arguments include the following
  - `max_iters = 100` - maximum number of iterations
  - `tol = 1e-7` - termination tolerance between upper and lower bounds
@@ -273,7 +273,7 @@ OptiNode or subgraph on `graph`. key ward arguments include the following
  - `slack_penalty = 1e6` - coefficient on slack variables in objective
  - `regularize_param = 0.5` - regularization parameter; must be between 0 and 1
 """
-function BendersOptimizer(
+function BendersAlgorithm(
     graph::Plasmo.OptiGraph,
     root_object::T;
     solver = nothing,
@@ -301,10 +301,10 @@ function BendersOptimizer(
     apply_partition!(graph, node_partition)
     start_graph = getsubgraphs(graph)[1]
 
-    return BendersOptimizer(graph, start_graph; solver = solver, args...)
+    return BendersAlgorithm(graph, start_graph; solver = solver, args...)
 end
 
-function BendersOptimizer(
+function BendersAlgorithm(
     graph::Plasmo.OptiGraph,
     root_object::T;
     max_iters = 100,
@@ -330,13 +330,13 @@ function BendersOptimizer(
         error("root_object is not defined in the graph")
     end
 
-    println("Initializing BendersOptimizer...")
+    println("Initializing BendersAlgorithm...")
     flush(stdout)
 
     time_init = @elapsed begin
 
         # Initiailize optimizer and graph
-        optimizer = BendersOptimizer{T}()
+        optimizer = BendersAlgorithm{T}()
         optimizer.graph = graph
 
         set_strengthened!(optimizer, strengthened)
@@ -473,7 +473,7 @@ function BendersOptimizer(
         end
     end
 
-    println("BendersOptimizer Initialized!")
+    println("BendersAlgorithm Initialized!")
 
     optimizer.time_init += time_init
 
@@ -481,20 +481,20 @@ function BendersOptimizer(
 end
 
 """
-    JuMP.optimize!(optimizer::PB.BendersOptimizer; output::Bool = true, run_gc::Bool = false)
+    run_algorithm!(optimizer::PB.BendersAlgorithm; output::Bool = true, run_gc::Bool = false)
 
-Optimize the graph in BendersOptimizer by using the DDP algorithm. Keyword argument `output`
+Optimize the graph in BendersAlgorithm by using the DDP algorithm. Keyword argument `output`
 indicates whether to print the upper/lower bounds and gap and each iteraiton. `run_gc` indicates
 whether to run the garbage collector after each iteraiton. 
 """
-function JuMP.optimize!(
-    optimizer::BendersOptimizer;
+function run_algorithm!(
+    optimizer::BendersAlgorithm;
     output::Bool = true,
     run_gc::Bool = false
 )
 
     println("################################################")
-    println("Running BendersOptimizer")
+    println("Running BendersAlgorithm")
     println("################################################")
     println()
     println("Number of Variables: $(length(all_variables(optimizer.graph)))")
@@ -604,7 +604,7 @@ function JuMP.optimize!(
 end
 
 """
-    _forward_pass!(optimizer::BendersOptimizer)
+    _forward_pass!(optimizer::BendersAlgorithm)
 
 Runs the forward pass for DDP. Follows the node order in `solve_order` attribute. Save the
 primal information for complicating variables on each node. If it is not a MIP, also saves
@@ -612,7 +612,7 @@ the dual and objective value information and adds the Benders cut. Returns the u
 lower bounds, where lower bound is only valid if the problem is not a MIP (otherwise the lower
 bound comes from the backward pass)
 """
-function _forward_pass!(optimizer::BendersOptimizer)
+function _forward_pass!(optimizer::BendersAlgorithm)
     ########## Solve the first node ############
     root_object = optimizer.solve_order[1]
 
@@ -718,14 +718,14 @@ function _forward_pass!(optimizer::BendersOptimizer)
 end
 
 """
-    _backward_pass!(optimizer::BendersOptimizer)
+    _backward_pass!(optimizer::BendersAlgorithm)
 
 Perform backward pass for a MIP problem. Backward pass can be done in parallel. Binary
 and integer variables are relaxed and the problem is solved to get the dual and objective
 values for producing Benders cuts. If `strengthened = true`, the stengthened cuts are ALSO
 added using the approach of Zou et al. https://doi.org/10.1007/s10107-018-1249-5.
 """
-function _backward_pass!(optimizer::BendersOptimizer; strengthened::Bool = false)
+function _backward_pass!(optimizer::BendersAlgorithm; strengthened::Bool = false)
 
     len_solve_order = length(optimizer.solve_order)
 

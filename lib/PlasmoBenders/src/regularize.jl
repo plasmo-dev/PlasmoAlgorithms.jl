@@ -11,17 +11,17 @@ for field in _rd_fields
     method = Symbol("get_regularize_", field)
     @eval begin
         @doc """
-            $($method)(optimizer::BendersOptimizer)
-        Return the value of $($(QuoteNode(field))) from the `regularize_data` field of the `BendersOptimizer`
+            $($method)(optimizer::BendersAlgorithm)
+        Return the value of $($(QuoteNode(field))) from the `regularize_data` field of the `BendersAlgorithm`
         """
-        $method(optimizer::BendersOptimizer) = getproperty(optimizer.regularize_data, $(QuoteNode(field)))
+        $method(optimizer::BendersAlgorithm) = getproperty(optimizer.regularize_data, $(QuoteNode(field)))
     end
     @eval export $method
 end
 
 
 function _construct_regularize!(
-    optimizer::BendersOptimizer{T}
+    optimizer::BendersAlgorithm{T}
 ) where {T <: Union{Plasmo.OptiGraph, Plasmo.OptiNode}}
     for (i, object) in enumerate(optimizer.solve_order)
         next_objects = optimizer.solve_order_dict[object]
@@ -39,7 +39,7 @@ function _construct_regularize!(
 end
 
 function _regularize_pass!(
-    optimizer::BendersOptimizer{T},
+    optimizer::BendersAlgorithm{T},
     object,
     ub
 ) where {T <: Union{Plasmo.OptiGraph, Plasmo.OptiNode}}
@@ -117,7 +117,7 @@ function _regularize_pass!(
     end
 end
 
-function _init_regularize_bounds!(optimizer::BendersOptimizer)
+function _init_regularize_bounds!(optimizer::BendersAlgorithm)
     len_solve_order = length(optimizer.solve_order)
     for i in len_solve_order:-1:1
         object = optimizer.solve_order[i]

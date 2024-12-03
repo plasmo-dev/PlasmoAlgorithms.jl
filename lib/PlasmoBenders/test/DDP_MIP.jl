@@ -38,12 +38,12 @@ graphtest = OptiGraph()
 
 
 function test_DDP_MIP_initialization()
-    @test_throws ErrorException BendersOptimizer(graph, graphtest)
+    @test_throws ErrorException BendersAlgorithm(graph, graphtest)
 
     max_iters = 50
     tol = 1e-5
     M = -100
-    DDPOpt = BendersOptimizer(graph, subgraphs[1]; max_iters = max_iters, tol = tol, M = M)
+    DDPOpt = BendersAlgorithm(graph, subgraphs[1]; max_iters = max_iters, tol = tol, M = M)
 
     @test DDPOpt.graph == graph
     @test DDPOpt.root_object == subgraphs[1]

@@ -1,4 +1,4 @@
-function _init_ext!(optimizer::BendersOptimizer{Plasmo.OptiGraph})
+function _init_ext!(optimizer::BendersAlgorithm{Plasmo.OptiGraph})
     graph = optimizer.graph
     subgraphs = getsubgraphs(graph)
 
@@ -28,7 +28,7 @@ function _init_ext!(optimizer::BendersOptimizer{Plasmo.OptiGraph})
     return nothing
 end
 
-function _add_second_object!(optimizer::BendersOptimizer{Plasmo.OptiGraph}, relaxed)
+function _add_second_object!(optimizer::BendersAlgorithm{Plasmo.OptiGraph}, relaxed)
     graph = optimizer.graph
     root_object = optimizer.root_object
     parent_objects = optimizer.parent_objects
@@ -78,7 +78,7 @@ function _add_second_object!(optimizer::BendersOptimizer{Plasmo.OptiGraph}, rela
 end
 
 function _add_cost_to_go!(
-    optimizer::BendersOptimizer{Plasmo.OptiGraph},
+    optimizer::BendersAlgorithm{Plasmo.OptiGraph},
     last_object::Plasmo.OptiGraph,
     relaxed::Bool
 )
@@ -107,7 +107,7 @@ function _add_cost_to_go!(
 end
 
 function _add_complicating_variables!(
-    optimizer::BendersOptimizer{Plasmo.OptiGraph},
+    optimizer::BendersAlgorithm{Plasmo.OptiGraph},
     last_object::Plasmo.OptiGraph,
     next_object::Plasmo.OptiGraph,
     add_slacks::Bool,
@@ -335,7 +335,7 @@ function _add_complicating_variables!(
 end
 
 function _add_next_object!(
-    optimizer::BendersOptimizer{Plasmo.OptiGraph},
+    optimizer::BendersAlgorithm{Plasmo.OptiGraph},
     last_object::Plasmo.OptiGraph,
     next_object::Plasmo.OptiGraph,
     relaxed::Bool

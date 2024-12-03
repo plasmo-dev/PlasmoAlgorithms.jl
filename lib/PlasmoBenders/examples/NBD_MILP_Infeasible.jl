@@ -18,8 +18,8 @@ set_optimizer(nodes[2], optimizer_with_attributes(HiGHS.Optimizer, "output_flag"
 solver = optimizer_with_attributes(HiGHS.Optimizer, "output_flag" => false)
 
 
-BendersOpt = BendersOptimizer(g, nodes[1]; max_iters = 30, add_slacks = true, fix_slacks = true, solver = solver)
+BendersOpt = BendersAlgorithm(g, nodes[1]; max_iters = 30, add_slacks = true, fix_slacks = true, solver = solver)
 
 t2 = @elapsed begin
-    optimize!(BendersOpt;)
+    run_algorithm!(BendersOpt;)
 end

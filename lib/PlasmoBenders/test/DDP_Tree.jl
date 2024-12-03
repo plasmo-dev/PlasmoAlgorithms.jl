@@ -44,7 +44,7 @@ function test_DDP_Tree_initialization()
     max_iters = 50
     tol = 1e-5
     M = -100
-    DDPOpt = BendersOptimizer(graph, subgraphs[1]; max_iters = max_iters, tol = tol, M = M)
+    DDPOpt = BendersAlgorithm(graph, subgraphs[1]; max_iters = max_iters, tol = tol, M = M)
 
     @test length(DDPOpt.solve_order) == 4
     @test length(keys(DDPOpt.solve_order_dict)) == 4
@@ -61,7 +61,7 @@ function test_DDP_Tree_initialization()
     @test get_parallelize_backward(DDPOpt) == false
 
     graph, nodes, subgraphs = build_graph()
-    @test_throws ErrorException BendersOptimizer(graph, subgraphs[1], parallelize_benders = true)
+    @test_throws ErrorException BendersAlgorithm(graph, subgraphs[1], parallelize_benders = true)
 
 end
 

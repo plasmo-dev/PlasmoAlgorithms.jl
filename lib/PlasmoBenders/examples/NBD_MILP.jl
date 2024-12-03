@@ -32,8 +32,8 @@ for i in 1:length(subgraphs)
     set_optimizer(subgraphs[i], optimizer_with_attributes(HiGHS.Optimizer, "output_flag" => false))
 end
 
-BendersOpt = BendersOptimizer(g, subgraphs[1]; max_iters = 30, add_slacks = true, fix_slacks = true, strengthened = true)
+BendersOpt = BendersAlgorithm(g, subgraphs[1]; max_iters = 30, add_slacks = true, fix_slacks = true, strengthened = true)
 
 t2 = @elapsed begin
-    optimize!(BendersOpt)
+    run_algorithm!(BendersOpt)
 end

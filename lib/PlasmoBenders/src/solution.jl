@@ -1,5 +1,5 @@
 function _add_cut_constraint!(
-    optimizer::BendersOptimizer{Plasmo.OptiGraph},
+    optimizer::BendersAlgorithm{Plasmo.OptiGraph},
     last_object::Plasmo.OptiGraph,
     theta_expr::V,
     rhs_expr::GenericAffExpr{Float64, Plasmo.NodeVariableRef}
@@ -19,12 +19,12 @@ function _add_cut_constraint!(
 end
 
 """
-    _add_Benders_cuts!(optimizer::BendersOptimizer)
+    _add_Benders_cuts!(optimizer::BendersAlgorithm)
 
 Add Benders cuts to each nested problem; uses results from the backward pass and forward
 pass to create cuts.
 """
-function _add_Benders_cuts!(optimizer::BendersOptimizer)
+function _add_Benders_cuts!(optimizer::BendersAlgorithm)
     # Loop through each object; compile information and add Benders cut
     for i in 1:(length(optimizer.solve_order))
         last_object = optimizer.solve_order[i]
@@ -293,14 +293,14 @@ function _optimize_in_backward_pass(optimizer, i)
 end
 
 """
-    _add_strengthened_cuts!(optimizer::BendersOptimizer)
+    _add_strengthened_cuts!(optimizer::BendersAlgorithm)
 
 Add strengthened Benders cuts to each nested problem; Follows the process described by
 Zou et al., 2019 (https://doi.org/10.1007/s10107-018-1249-5) where the cuts come from a
 Lagrangian relaxation where the lagrange multipliers are the dual variables of the
 backward pass.
 """
-function _add_strengthened_cuts!(optimizer::BendersOptimizer)
+function _add_strengthened_cuts!(optimizer::BendersAlgorithm)
     # Loop through each object and add strengthened Benders cut
     Threads.@threads for i in 1:(length(optimizer.solve_order) - 1)
     #for i in 1:(length(optimizer.solve_order) - 1)
@@ -374,10 +374,10 @@ function _add_strengthened_cuts!(optimizer::BendersOptimizer)
 end
 
 """
-    _add_initial_relaxed_cuts!(optimizer::BendersOptimizer)
+    _add_initial_relaxed_cuts!(optimizer::BendersAlgorithm)
 """
 function _add_initial_relaxed_cuts!(
-    optimizer::BendersOptimizer{T}
+    optimizer::BendersAlgorithm{T}
 ) where {T <: Union{Plasmo.OptiNode, Plasmo.OptiGraph}}
     link_vars_mapping = Dict{T, Vector{ConstraintRef}}()
 
@@ -478,7 +478,7 @@ function _add_initial_relaxed_cuts!(
     optimizer.ext["link_var_mapping"] = link_vars_mapping
 end
 
-function _add_to_upper_bound!(optimizer::BendersOptimizer, object::OptiGraph, ub)
+function _add_to_upper_bound!(optimizer::BendersAlgorithm, object::OptiGraph, ub)
     obj_val = JuMP.value(object, JuMP.objective_function(object))
     ub[1] += obj_val
     if length(optimizer.solve_order_dict[object]) > 0

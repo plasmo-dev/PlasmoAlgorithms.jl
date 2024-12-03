@@ -37,7 +37,7 @@ module TestDDP_MIP_solves
         return graph
     end
 
-    function get_gap(DDPOpt::BendersOptimizer)
+    function get_gap(DDPOpt::BendersAlgorithm)
         ub = DDPOpt.best_upper_bound
         lb = DDPOpt.lower_bounds[end]
 
@@ -47,26 +47,26 @@ module TestDDP_MIP_solves
     end
 
     gtest = build_graph()
-    DDPOpt = BendersOptimizer(gtest, getsubgraphs(gtest)[1], max_iters = 20);
-    optimize!(DDPOpt)
+    DDPOpt = BendersAlgorithm(gtest, getsubgraphs(gtest)[1], max_iters = 20);
+    run_algorithm!(DDPOpt)
     @test isapprox(DDPOpt.best_upper_bound, 5.8, rtol = 1e-6)
 
     gtest = build_graph()
-    DDPOpt = BendersOptimizer(gtest, getsubgraphs(gtest)[1], max_iters = 20, strengthened = true);
-    optimize!(DDPOpt)
-    @test isapprox(DDPOpt.best_upper_bound, 5.8, rtol = 1e-6)
-    @test isapprox(get_gap(DDPOpt), 0, rtol = 1e-6)
-
-    gtest = build_graph()
-    DDPOpt = BendersOptimizer(gtest, getsubgraphs(gtest)[1], max_iters = 20, strengthened = true, multicut = true);
-    optimize!(DDPOpt)
+    DDPOpt = BendersAlgorithm(gtest, getsubgraphs(gtest)[1], max_iters = 20, strengthened = true);
+    run_algorithm!(DDPOpt)
     @test isapprox(DDPOpt.best_upper_bound, 5.8, rtol = 1e-6)
     @test isapprox(get_gap(DDPOpt), 0, rtol = 1e-6)
 
     gtest = build_graph()
-    DDPOpt = BendersOptimizer(gtest, getsubgraphs(gtest)[1], max_iters = 20, strengthened = true, multicut = true, regularize = false, parallelize_backward = true
+    DDPOpt = BendersAlgorithm(gtest, getsubgraphs(gtest)[1], max_iters = 20, strengthened = true, multicut = true);
+    run_algorithm!(DDPOpt)
+    @test isapprox(DDPOpt.best_upper_bound, 5.8, rtol = 1e-6)
+    @test isapprox(get_gap(DDPOpt), 0, rtol = 1e-6)
+
+    gtest = build_graph()
+    DDPOpt = BendersAlgorithm(gtest, getsubgraphs(gtest)[1], max_iters = 20, strengthened = true, multicut = true, regularize = false, parallelize_backward = true
     );
-    optimize!(DDPOpt)
+    run_algorithm!(DDPOpt)
     @test isapprox(DDPOpt.best_upper_bound, 5.8, rtol = 1e-6)
     @test isapprox(get_gap(DDPOpt), 0, rtol = 1e-6)
 

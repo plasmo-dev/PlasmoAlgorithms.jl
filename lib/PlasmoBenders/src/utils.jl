@@ -3,21 +3,21 @@ function Plasmo.incident_edges(graph::Plasmo.OptiGraph, subgraph::Plasmo.OptiGra
     return incident_edges(projection, all_nodes(subgraph))
 end
 
-function _theta_value(optimizer::BendersOptimizer, object::Plasmo.OptiGraph)
+function _theta_value(optimizer::BendersAlgorithm, object::Plasmo.OptiGraph)
     theta_var = optimizer.ext["theta_vars"][object]
     return sum(JuMP.value(object, theta) for theta in theta_var)
 end
 
-function _get_theta(optimizer::BendersOptimizer, object::Plasmo.OptiGraph)
+function _get_theta(optimizer::BendersAlgorithm, object::Plasmo.OptiGraph)
     return optimizer.ext["theta_vars"][object]
 end
 
-function _get_theta(optimizer::BendersOptimizer, object::Plasmo.OptiGraph, idx::Int)
+function _get_theta(optimizer::BendersAlgorithm, object::Plasmo.OptiGraph, idx::Int)
     return optimizer.ext["theta_vars"][object][idx]
 end
 
 # Define a function for getting the dual value of the linking constraints
-function _get_next_duals(optimizer::BendersOptimizer, next_object::Plasmo.OptiGraph)
+function _get_next_duals(optimizer::BendersAlgorithm, next_object::Plasmo.OptiGraph)
     var_copy_map = optimizer.var_copy_map[next_object]
     comp_vars = optimizer.comp_vars[next_object]
 
@@ -28,7 +28,7 @@ end
 # TODO: Need to improve the interface for getting values
 # Define function for getting the best solution from the optimizer
 function JuMP.value(
-    optimizer::BendersOptimizer{Plasmo.OptiGraph},
+    optimizer::BendersAlgorithm{Plasmo.OptiGraph},
     var::NodeVariableRef,
     object::Plasmo.OptiGraph
 )
@@ -45,12 +45,12 @@ function JuMP.value(
 end
 
 """
-    JuMP.value(opt::BendersOptimizer, var::NodeVariableRef)
+    JuMP.value(opt::BendersAlgorithm, var::NodeVariableRef)
     
-Returns the value of `var` from the BendersOptimizer object. The value corresponds to the
+Returns the value of `var` from the BendersAlgorithm object. The value corresponds to the
 best upper bound of the optimizer.
 """
-function JuMP.value(optimizer::BendersOptimizer, var::NodeVariableRef)
+function JuMP.value(optimizer::BendersAlgorithm, var::NodeVariableRef)
     best_solutions = optimizer.best_solutions
     var_solution_map = optimizer.var_solution_map
     var_to_graph_map = optimizer.var_to_graph_map
@@ -68,12 +68,12 @@ function JuMP.value(optimizer::BendersOptimizer, var::NodeVariableRef)
 end
 
 """
-    JuMP.value(opt::BendersOptimizer, vars::Vector{NodeVariableRef})
+    JuMP.value(opt::BendersAlgorithm, vars::Vector{NodeVariableRef})
     
-Returns a vector of variables contained in the `vars` vector from the BendersOptimizer
+Returns a vector of variables contained in the `vars` vector from the BendersAlgorithm
 object. The values correspond to the best upper bound of the optimizer.
 """
-function JuMP.value(optimizer::BendersOptimizer, vars::Vector{NodeVariableRef})
+function JuMP.value(optimizer::BendersAlgorithm, vars::Vector{NodeVariableRef})
     best_solutions = optimizer.best_solutions
     var_solution_map = optimizer.var_solution_map
     var_to_graph_map = optimizer.var_to_graph_map
@@ -96,21 +96,21 @@ function JuMP.value(optimizer::BendersOptimizer, vars::Vector{NodeVariableRef})
     return value_vector
 end
 
-function JuMP.objective_value(optimizer::BendersOptimizer)
+function JuMP.objective_value(optimizer::BendersAlgorithm)
     if optimizer.current_iter == 0
         error("Optimize has not been called")
     end
     return optimizer.best_upper_bound
 end
 
-function JuMP.dual_objective_value(optimizer::BendersOptimizer)
+function JuMP.dual_objective_value(optimizer::BendersAlgorithm)
     if optimizer.current_iter == 0
         error("Optimize has not been called")
     end
     return optimizer.lower_bounds[end]
 end
 
-function relative_gap(optimizer::BendersOptimizer)
+function relative_gap(optimizer::BendersAlgorithm)
     if optimizer.current_iter == 0
         error("Optimize has not been called")
     end
@@ -123,7 +123,7 @@ function relative_gap(optimizer::BendersOptimizer)
 end
 
 # Define function for warm starting
-function _warm_start(optimizer::BendersOptimizer, object)
+function _warm_start(optimizer::BendersAlgorithm, object)
     all_vars = all_variables(object)
     all_vals = optimizer.best_solutions[object]
 
@@ -134,7 +134,7 @@ function _warm_start(optimizer::BendersOptimizer, object)
 end
 
 # Define functions for adding slacks, and adding them to the objectives
-function _add_slack_to_node(optimizer::BendersOptimizer, next_object, node::Plasmo.OptiNode, num_links, slack_penalty)
+function _add_slack_to_node(optimizer::BendersAlgorithm, next_object, node::Plasmo.OptiNode, num_links, slack_penalty)
     # Define slack variables
     @variable(node, _slack_up[1:num_links] >= 0)
     @variable(node, _slack_down[1:num_links] >= 0)
@@ -171,7 +171,7 @@ function _add_slack_to_node(optimizer::BendersOptimizer, next_object, node::Plas
     @objective(node, Min, obj_func)
 end
 
-function _add_slack_to_node_for_links(optimizer::BendersOptimizer, next_object::Plasmo.OptiGraph, node::Plasmo.OptiNode, num_links, slack_penalty)
+function _add_slack_to_node_for_links(optimizer::BendersAlgorithm, next_object::Plasmo.OptiGraph, node::Plasmo.OptiNode, num_links, slack_penalty)
     # Define slack variables
     @variable(node, _slack_up_link[1:num_links] >= 0)
     @variable(node, _slack_down_link[1:num_links] >= 0)
@@ -210,7 +210,7 @@ function _add_slack_to_node_for_links(optimizer::BendersOptimizer, next_object::
 end
 
 # Test if the problem is a MIP
-function _set_is_MIP(optimizer::BendersOptimizer)
+function _set_is_MIP(optimizer::BendersAlgorithm)
     graph = optimizer.graph
 
     graph_vars = setdiff(JuMP.all_variables(graph), JuMP.all_variables(optimizer.root_object))
@@ -225,7 +225,7 @@ function _set_is_MIP(optimizer::BendersOptimizer)
     return nothing
 end
 
-function _get_objects(optimizer::BendersOptimizer{Plasmo.OptiGraph})
+function _get_objects(optimizer::BendersAlgorithm{Plasmo.OptiGraph})
     return getsubgraphs(optimizer.graph)
 end
 
@@ -233,7 +233,7 @@ function _get_objects(graph::Plasmo.OptiGraph)
     return getsubgraphs(graph)
 end
 
-function _check_termination_status(optimizer::BendersOptimizer, object, count)
+function _check_termination_status(optimizer::BendersAlgorithm, object, count)
     if termination_status(object) == MOI.INFEASIBLE
         if get_add_slacks(optimizer)
             if haskey(optimizer.slack_vars, object)
@@ -266,7 +266,7 @@ function _check_termination_status(optimizer::BendersOptimizer, object, count)
     end
 end
 
-function JuMP.objective_value(optimizer::BendersOptimizer, object, last_obj::Bool)
+function JuMP.objective_value(optimizer::BendersAlgorithm, object, last_obj::Bool)
     if optimizer.parallelize_Benders && last_obj
         subs = get_subgraphs(object)
         if length(subs) > 0
@@ -283,7 +283,7 @@ function JuMP.objective_value(optimizer::BendersOptimizer, object, last_obj::Boo
     end
 end
 
-function _check_fixed_slacks!(optimizer::BendersOptimizer, object)
+function _check_fixed_slacks!(optimizer::BendersAlgorithm, object)
     if get_add_slacks(optimizer)
         if get_fix_slacks(optimizer)
             slack_vars = optimizer.slack_vars
@@ -298,7 +298,7 @@ function _check_fixed_slacks!(optimizer::BendersOptimizer, object)
     end
 end
 
-function _check_parallelize_Benders(optimizer::BendersOptimizer)
+function _check_parallelize_Benders(optimizer::BendersAlgorithm)
     if get_parallelize_benders(optimizer) || get_regularize(optimizer)
         graph = optimizer.graph
         root_object = optimizer.root_object
@@ -340,10 +340,10 @@ for field in union(_options_bool_fields, _options_real_fields)
     method = Symbol("get_", field)
     @eval begin
         @doc """
-            $($method)(optimizer::BendersOptimizer)
-        Return the value of $($(QuoteNode(field))) from the `options` field of the `BendersOptimizer`
+            $($method)(optimizer::BendersAlgorithm)
+        Return the value of $($(QuoteNode(field))) from the `options` field of the `BendersAlgorithm`
         """
-        $method(optimizer::BendersOptimizer) = getproperty(optimizer.options, $(QuoteNode(field)))
+        $method(optimizer::BendersAlgorithm) = getproperty(optimizer.options, $(QuoteNode(field)))
     end
     @eval export $method
 end
@@ -352,10 +352,10 @@ for field in _options_bool_fields
     method = Symbol("set_", field, "!")
     @eval begin
         @doc """
-            $($method)(optimizer::BendersOptimizer, val::Bool)
-        Set the value of $($(QuoteNode(field))) from the `options` field of the `BendersOptimizer` to `val`
+            $($method)(optimizer::BendersAlgorithm, val::Bool)
+        Set the value of $($(QuoteNode(field))) from the `options` field of the `BendersAlgorithm` to `val`
         """
-        $method(optimizer::BendersOptimizer, val::Bool) = optimizer.options.$field = val
+        $method(optimizer::BendersAlgorithm, val::Bool) = optimizer.options.$field = val
     end
     @eval export $method
 end
@@ -364,10 +364,10 @@ for field in _options_real_fields
     method = Symbol("set_", field, "!")
     @eval begin
         @doc """
-            $($method)(optimizer::BendersOptimizer, val::Real)
-        Set the value of $($(QuoteNode(field))) from the `options` field of the `BendersOptimizer` to `val`
+            $($method)(optimizer::BendersAlgorithm, val::Real)
+        Set the value of $($(QuoteNode(field))) from the `options` field of the `BendersAlgorithm` to `val`
         """
-        $method(optimizer::BendersOptimizer, val::Real) = optimizer.options.$field = val
+        $method(optimizer::BendersAlgorithm, val::Real) = optimizer.options.$field = val
     end
     @eval export $method
 end

@@ -38,8 +38,8 @@ for i in gs
     set_optimizer(i, solver)
 end
 
-BendersOpt = BendersOptimizer(g0, g1; max_iters = 20, parallelize_benders = true, regularize = false)
+BendersOpt = BendersAlgorithm(g0, g1; max_iters = 20, parallelize_benders = true, regularize = false)
 
 t2 = @elapsed begin
-    optimize!(BendersOpt)
+    run_algorithm!(BendersOpt)
 end
