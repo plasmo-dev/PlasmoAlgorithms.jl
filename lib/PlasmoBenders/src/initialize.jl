@@ -1,6 +1,6 @@
 function _init_ext!(optimizer::BendersAlgorithm{Plasmo.OptiGraph})
     graph = optimizer.graph
-    subgraphs = getsubgraphs(graph)
+    subgraphs = local_subgraphs(graph)
 
     # Define mappings for variables and nodes to their subgraph
     var_to_graph_map = Dict{NodeVariableRef, Plasmo.OptiGraph}()

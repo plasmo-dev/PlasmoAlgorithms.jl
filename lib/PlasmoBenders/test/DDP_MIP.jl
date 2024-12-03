@@ -27,7 +27,7 @@ apply_partition!(graph, partition)
 set_optimizer(graph, HiGHS.Optimizer)
 set_to_node_objectives(graph)
 
-subgraphs = getsubgraphs(graph)
+subgraphs = local_subgraphs(graph)
 for i in 1:length(subgraphs)
     set_to_node_objectives(subgraphs[i])
     set_optimizer(subgraphs[i], optimizer_with_attributes(HiGHS.Optimizer, "output_flag" => false))

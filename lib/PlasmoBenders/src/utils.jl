@@ -226,11 +226,11 @@ function _set_is_MIP(optimizer::BendersAlgorithm)
 end
 
 function _get_objects(optimizer::BendersAlgorithm{Plasmo.OptiGraph})
-    return getsubgraphs(optimizer.graph)
+    return local_subgraphs(optimizer.graph)
 end
 
 function _get_objects(graph::Plasmo.OptiGraph)
-    return getsubgraphs(graph)
+    return local_subgraphs(graph)
 end
 
 function _check_termination_status(optimizer::BendersAlgorithm, object, count)

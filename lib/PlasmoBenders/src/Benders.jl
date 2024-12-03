@@ -299,7 +299,7 @@ function BendersAlgorithm(
     node_partition = Partition(graph, node_membership_vector)
 
     apply_partition!(graph, node_partition)
-    start_graph = getsubgraphs(graph)[1]
+    start_graph = local_subgraphs(graph)[1]
 
     return BendersAlgorithm(graph, start_graph; solver = solver, args...)
 end
@@ -326,7 +326,7 @@ function BendersAlgorithm(
     regularize_param::Real = 0.5
 ) where {T <: Plasmo.OptiGraph}
 
-    if !(root_object in getsubgraphs(graph))
+    if !(root_object in local_subgraphs(graph))
         error("root_object is not defined in the graph")
     end
 

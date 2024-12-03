@@ -28,7 +28,7 @@ module TestDDP_LP_solves
         set_optimizer(graph, HiGHS.Optimizer)
         set_to_node_objectives(graph)
 
-        subgraphs = getsubgraphs(graph)
+        subgraphs = local_subgraphs(graph)
         for i in 1:length(subgraphs)
             set_to_node_objectives(subgraphs[i])
             set_optimizer(subgraphs[i], solver)
@@ -47,19 +47,19 @@ module TestDDP_LP_solves
     end
 
     gtest = build_graph()
-    DDPOpt = BendersAlgorithm(gtest, getsubgraphs(gtest)[1], max_iters = 20);
+    DDPOpt = BendersAlgorithm(gtest, local_subgraphs(gtest)[1], max_iters = 20);
     run_algorithm!(DDPOpt)
     @test isapprox(DDPOpt.best_upper_bound, 5.5, rtol = 1e-6)
 
 
     gtest = build_graph()
-    DDPOpt = BendersAlgorithm(gtest, getsubgraphs(gtest)[1], max_iters = 20, multicut = true);
+    DDPOpt = BendersAlgorithm(gtest, local_subgraphs(gtest)[1], max_iters = 20, multicut = true);
     run_algorithm!(DDPOpt)
     @test isapprox(DDPOpt.best_upper_bound, 5.5, rtol = 1e-6)
     @test isapprox(get_gap(DDPOpt), 0, rtol = 1e-6)
 
     gtest = build_graph()
-    DDPOpt = BendersAlgorithm(gtest, getsubgraphs(gtest)[1], max_iters = 20, multicut = true, regularize = false, parallelize_backward = true);
+    DDPOpt = BendersAlgorithm(gtest, local_subgraphs(gtest)[1], max_iters = 20, multicut = true, regularize = false, parallelize_backward = true);
     run_algorithm!(DDPOpt)
     @test isapprox(DDPOpt.best_upper_bound, 5.5, rtol = 1e-6)
     @test isapprox(get_gap(DDPOpt), 0, rtol = 1e-6)
