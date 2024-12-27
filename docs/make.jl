@@ -31,4 +31,4 @@ makedocs(;
     ],
 )
 
-#deploydocs(; repo="github.com/plasmo-dev/PlasmoAlgorithms.jl.git")
+deploydocs(; repo="github.com/plasmo-dev/PlasmoAlgorithms.jl.git")
