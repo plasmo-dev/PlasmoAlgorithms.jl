@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Equipment Sizing · PlasmoAlgorithms.jl</title><meta name="title" content="Equipment Sizing · PlasmoAlgorithms.jl"/><meta property="og:title" content="Equipment Sizing · PlasmoAlgorithms.jl"/><meta property="twitter:title" content="Equipment Sizing · PlasmoAlgorithms.jl"/><meta name="description" content="Documentation for PlasmoAlgorithms.jl."/><meta property="og:description" content="Documentation for PlasmoAlgorithms.jl."/><meta property="twitter:description" content="Documentation for PlasmoAlgorithms.jl."/><script data-outdated-warner src="../../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.050/juliamono.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="../.."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../../assets/documenter.js"></script><script src="../../search_index.js"></script><script src="../../siteinfo.js"></script><script src="../../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-mocha.css" data-theme-name="catppuccin-mocha"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-macchiato.css" data-theme-name="catppuccin-macchiato"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-frappe.css" data-theme-name="catppuccin-frappe"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/catppuccin-latte.css" data-theme-name="catppuccin-latte"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../../assets/themeswap.js"></script></head><body><div id="documenter"><nav class="docs-sidebar"><div class="docs-package-name"><span class="docs-autofit"><a href="../../">PlasmoAlgorithms.jl</a></span></div><button class="docs-search-query input is-rounded is-small is-clickable my-2 mx-auto py-1 px-2" id="documenter-search-query">Search docs (Ctrl + /)</button><ul class="docs-menu"><li><a class="tocitem" href="../../">Introduction</a></li><li><span class="tocitem">PlasmoBenders.jl</span><ul><li><a class="tocitem" href="../introduction/">Introduction</a></li><li><a class="tocitem" href="../algorithm/">Algorithm</a></li><li><a class="tocitem" href="../quickstart/">Quickstart</a></li><li><a class="tocitem" href="../solver/">Solver Options</a></li><li><a class="tocitem" href="../graph_structure/">Exploiting Graph Structure</a></li><li><a class="tocitem" href="../api_docs/">API Documentation</a></li><li><input class="collapse-toggle" id="menuitem-2-7" type="checkbox" checked/><label class="tocitem" for="menuitem-2-7"><span class="docs-label">Tutorials</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../storage_tutorial/">Storage Operation</a></li><li class="is-active"><a class="tocitem" href>Equipment Sizing</a><ul class="internal"><li><a class="tocitem" href="#Problem-Formulation"><span>Problem Formulation</span></a></li><li><a class="tocitem" href="#Modeling-the-Problem-with-Plasmo"><span>Modeling the Problem with Plasmo</span></a></li><li><a class="tocitem" href="#Solving-with-PlasmoBenders"><span>Solving with PlasmoBenders</span></a></li><li><a class="tocitem" href="#Adding-extra-scenarios"><span>Adding extra scenarios</span></a></li></ul></li></ul></li></ul></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><a class="docs-sidebar-button docs-navbar-link fa-solid fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a><nav class="breadcrumb"><ul class="is-hidden-mobile"><li><a class="is-disabled">PlasmoBenders.jl</a></li><li><a class="is-disabled">Tutorials</a></li><li class="is-active"><a href>Equipment Sizing</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Equipment Sizing</a></li></ul></nav><div class="docs-right"><a class="docs-navbar-link" href="https://github.com/plasmo-dev/PlasmoAlgorithms.jl" title="View the repository on GitHub"><span class="docs-icon fa-brands"></span><span class="docs-label is-hidden-touch">GitHub</span></a><a class="docs-navbar-link" href="https://github.com/plasmo-dev/PlasmoAlgorithms.jl/blob/main/docs/src/PlasmoBenders/sizing_tutorial.md" title="Edit source on GitHub"><span class="docs-icon fa-solid"></span></a><a class="docs-settings-button docs-navbar-link fa-solid fa-gear" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-article-toggle-button fa-solid fa-chevron-up" id="documenter-article-toggle-button" href="javascript:;" title="Collapse all docstrings"></a></div></header><article class="content" id="documenter-page"><h1 id="System-Sizing"><a class="docs-heading-anchor" href="#System-Sizing">System Sizing</a><a id="System-Sizing-1"></a><a class="docs-heading-anchor-permalink" href="#System-Sizing" title="Permalink"></a></h1><p>This example is a simple example highlighting how PlasmoBenders can be applied to solve a problem using Benders Decomposition (BD). </p><h2 id="Problem-Formulation"><a class="docs-heading-anchor" href="#Problem-Formulation">Problem Formulation</a><a id="Problem-Formulation-1"></a><a class="docs-heading-anchor-permalink" href="#Problem-Formulation" title="Permalink"></a></h2><p>The example below is a simplified problem where we need to choose the size of a storage system and a reactor. In this problem, we are purchasing a raw material, <span>$x$</span>, that can be converted by a reactor into a product, <span>$y$</span>. There are varying costs for the raw material, and there are varying demands. We can store the raw material near the reactor, but the product must be produced to meet the demand (i.e., we are not storing the product). We have five options of storage size and five options of reactor size to choose from, and the costs are directly related to the size. The mathematical formulation of this problem is given below. </p><p class="math-container">\[\begin{align*}
+    \min &amp;\; \alpha_{storage} s_{size} + \alpha_{reactor} r_{size} + \sum_{t=1}^T c^{raw}_t x^{buy}_t + \beta y^{unmet}_t\\
+    \textrm{s.t.} &amp;\; x^{store}_{t+1} - x^{store}_t = x^{save}_t, \quad t = 1, ..., T-1\\
+    &amp;\; y^{product}_t = \gamma (x^{buy}_t - x^{save}_t), \quad t = 1, ..., T\\
+    &amp;\; y^{unmet}_t \ge D_t - y^{product}_t, \quad t = 1, ..., T \\
+    &amp;\; s_{size} = \sum_{i \in N} z^s_i \lambda^{storage}_i, \quad \sum_{i \in N} z^s_i = 1  \\
+    &amp;\; r_{size} = \sum_{i \in N} z^r_i \lambda^{reactor}_i, \quad \sum_{i \in N} z^r_i = 1 \\ 
+    &amp;\; 0 \le x^{store}_t \le s_{size}, \quad t = 1, ..., T \\
+    &amp;\; 0 \le x^{buy}_t - x^{save}_t \le r_{size}, \quad t = 1, ..., T\\
+    &amp;\; 0 \le x^{sell}_t \le \overline{d}^{sell}, \quad t = 1, ..., T \\
+    &amp;\; \underline{d}^{save} \le x^{save}_t \le \overline{d}^{save}, \quad t = 1, ..., T \\
+    &amp;\; x^{store}_1 = \bar{x}^{store}
+\end{align*}\]</p><p>Here, <span>$x^{buy}_t$</span> is the amount of raw material purchased at time <span>$t$</span>, <span>$x^{save}$</span> is the amount of raw material sent to storage (can be negative if it is removed from storage), <span>$y^{product}_t$</span> is the amount of product created by the reactor to meet the demand, <span>$D_t$</span>, <span>$y^{unmet}_t$</span> is the unmet demand (which is penalized in the objective), <span>$s_{size}$</span> is the chosen size of the storage unit, and <span>$r_{size}$</span> is the chosen size of the reactor. In this problem, we assume that we have <span>$N$</span> possible storage unit sizes and <span>$N$</span> possible reactor sizes, represented by <span>$\lambda^{storage}_i$</span> and <span>$\lambda^{reactor}_i$</span>, respectively. The binary variables <span>$z^s_i$</span> and <span>$z^r_i$</span> ensure that the storage and reactor sizes are equal to the available sizes, and we constrain the sum of the binary variables for storage and for the reactor to be equal to one (i.e., only choose one size). The choice of storage unit and reactor size are then upper bounds on the total raw material stored or the amount of raw material sent to the reactor (note that <span>$x^{buy}_t - x^{save}$</span> is the amount of raw material sent to the reactor). The parameters <span>$\alpha_{storage}$</span>, <span>$\alpha_{reactor}$</span>, <span>$c^{raw}_t$</span>, and <span>$\beta$</span> relate to the costs of their respective variables. <span>$\gamma$</span> is a conversion factor of raw material to product. </p><h2 id="Modeling-the-Problem-with-Plasmo"><a class="docs-heading-anchor" href="#Modeling-the-Problem-with-Plasmo">Modeling the Problem with Plasmo</a><a id="Modeling-the-Problem-with-Plasmo-1"></a><a class="docs-heading-anchor-permalink" href="#Modeling-the-Problem-with-Plasmo" title="Permalink"></a></h2><p>We can model this problem using Plasmo. This problem can be thought of as a <em>hierarchical optimization problem</em> where we must consider a planning decision (storage unit and reactor sizes) that are going to have impacts on an operational level. To handle this, we will create two subgraphs. The first will be a planning-level subgraph containing the storage unit and reactor sizing decisions (<span>$s_{size}$</span>, <span>$r_{size}$</span>, <span>$z^{s}$</span>, and <span>$z^{r}$</span>) and their corresponding constraints. The second will be an operations-level subgraph containing the operation behavior (<span>$x^{buy}_t$</span>, <span>$x^{store}_t$</span>, <span>$x^{save}_t$</span>, <span>$y^{product}_t$</span>, <span>$y^{unmet}_t$</span>). These two layers will be linked by constraints on the lower-level subgraph. We will then treat the planning level OptiGraph as the root graph and use BD to solve this problem. </p><p>First, we will define the cost and demand data we need for this problem. This can be done with the code snippet below: </p><pre><code class="language-julia hljs">using Random, Distributions
+t = 0:1:30
+
+Random.seed!(10)
+cost1 = sin.(x .* 2 .* pi ./ 10 ) .* 2 .+ 10 .+ rand(Uniform(-1,1),31) .* .5
+demand1 = sin.(x .* 2 .* pi ./ 15 ) .* 30 .+ 100 .+ rand(Uniform(-1,1),31) .* 5</code></pre><p>The resulting data can be visualized as shown below: </p><p><img src="../../figures/cost_demand_curve.png" alt="cost and demand"/></p><p>Next, we will define the root (planning-level) graph. We add a node to this graph that will contain the storage unit and reactor sizing variables.</p><pre><code class="language-julia hljs">using Plasmo, HiGHS, PlasmoBenders
+
+# Define graph and add a node
+g_root = OptiGraph()
+@optinode(g_root, n_root)
+
+# Set the possible storage and reactor sizes to choose from
+storage_sizes = [10, 50, 100, 500, 1000]
+reactor_sizes = [10, 20, 50, 100, 200]
+
+# Define variables for the sizes and define binary variables for choosing sizes
+@variable(n_root, storage_size &gt;= 0)
+@variable(n_root, reactor_size &gt;= 0)
+@variable(n_root, storage_bin[1:5], Bin)
+@variable(n_root, reactor_bin[1:5], Bin)
+
+# Ensure that we choose one and only one size
+@constraint(n_root, sum(storage_bin) == 1)
+@constraint(n_root, sum(reactor_bin) == 1)
+
+# Set the size variables equal to the binary variables times their respective options
+@constraint(n_root, storage_size == sum(storage_bin[i] * storage_sizes[i] for i in 1:5))
+@constraint(n_root, reactor_size == sum(reactor_bin[i] * reactor_sizes[i] for i in 1:5))
+
+# Set the objective on the node
+@objective(n_root, Min, 5 * storage_size + 20 * reactor_size)
+
+# Set the objective on the graph
+set_to_node_objectives(g_root)</code></pre><p>In the code above, we have defined five options for storage sizes (<span>$10$</span>, <span>$50$</span>, <span>$100$</span>, <span>$500$</span>, and <span>$1000$</span>) and five options for reactor sizes (<span>$10$</span>, <span>$20$</span>, <span>$50$</span>, <span>$100$</span>, and <span>$200$</span>). </p><p>We will now also create the operations-level subgraph. We will define a function that takes a cost and demand value input and build the graph via that function (for reasons that will be discussed later).</p><pre><code class="language-julia hljs">function build_scenario_graph(cost, demand, num_scenarios = 1)
+    # Define time points
+    T = length(cost)
+    
+    # Define OptiGraph and nodes (one node for each time point)
+    g = OptiGraph()
+    @optinode(g, n[1:T])
+
+    # Loop through the nodes  and add variables and constraints
+    for (t, node) in enumerate(n)
+
+        # Define variables on the nodes
+        @variable(node, 0 &lt;= x_buy )
+        @variable(node, -50 &lt;= x_save &lt;= 50)
+        @variable(node, 0 &lt;= x_store)
+        @variable(node, 0 &lt;= y_product)
+        @variable(node, 0 &lt;= unmet_demand)
+
+        # Add constraints to the nodes
+        @constraint(node, unmet_demand &gt;= demand[t] - y_product)
+        @constraint(node, y_product == 5 * (x_buy - x_save))
+
+        # Define objective on the node
+        @objective(node, Min, (unmet_demand * 1000 + x_buy * cost[t]) / num_scenarios)
+    end
+
+    # Set the initial storage amount
+    @constraint(n[1], n[1][:x_store] == 10)
+
+    # Link the storage variables acorss time points
+    @linkconstraint(g, [t = 1:(T-1)], n[t + 1][:x_store] - n[t][:x_store] == n[t][:x_save])
+    
+    # Set graph objective to summation of node objectives
+    set_to_node_objectives(g)
+
+    # Return the graph
+    return g
+end</code></pre><p>With the above function defined, we can now build a graph from our demand and cost data we defined. We will also define an overall graph <code>g</code> that will own the planning- and operations-level subgraphs. </p><pre><code class="language-julia hljs"># Define overall graph
+g = OptiGraph()
+
+# Define operations level subgraph
+g1 = build_scenario_graph(cost1, demand1)
+
+# Add subgraphs to graph `g`
+add_subgraph!(g, g_root)
+add_subgraph!(g, g1)</code></pre><p>With these graphs created, the last thing to do is to create the linking constraints between the layers. We will force the storage unit and reactor sizes to be upper bounds on their respective variables by defining linking constraints between the two subgraphs. </p><pre><code class="language-julia hljs"># Define time points
+T = length(all_nodes(g1))
+
+# Define constraints on storage and reactor sizes
+@linkconstraint(g, [t = 1:T], g1[:n][t][:x_store] &lt;= g_root[:n_root][:storage_size])
+@linkconstraint(g, [t = 1:T], g1[:n][t][:x_buy] - g1[:n][t][:x_save] &lt;= g_root[:n_root][:reactor_size])</code></pre><h2 id="Solving-with-PlasmoBenders"><a class="docs-heading-anchor" href="#Solving-with-PlasmoBenders">Solving with PlasmoBenders</a><a id="Solving-with-PlasmoBenders-1"></a><a class="docs-heading-anchor-permalink" href="#Solving-with-PlasmoBenders" title="Permalink"></a></h2><p>The subgraphs of this problem form a tree structure (two subgraphs with edges connecting them), so we can now apply BD via PlasmoBenders. We will create the <code>BendersOptimizer</code> object by calling </p><pre><code class="language-julia hljs"># Define a subproblem object to use for the subgraphs
+solver = optimizer_with_attributes(HiGHS.Optimizer, &quot;output_flag&quot; =&gt; false)
+
+# Define the BendersOptimizer object and set the subproblem solver
+benders_opt = BendersOptimizer(g, g_root, solver = solver)</code></pre><p>The <code>BendersOptimizer</code> object can now be solved by calling </p><pre><code class="language-julia hljs">optimize!(benders_opt)</code></pre><p>The upper and lower bounds and the gap from the BD algorithm are shown below. </p><p><img src="../../figures/sizing_example_plot.png" alt="sizing results"/></p><p>Here, the upper and lower bounds converge after 5 iterations. </p><p>It can help to look at the solutions after each iteration to better understand how the algorithm is operation. At iteration 1, there are no cutting planes, and the root subgraph is solved first (independent of the operations-level). This means that it is <em>only</em> trying to minimize cost by choosing the least expensive options. Therefore, it chooses the smalles storage unit and reactor sizes (<span>$10$</span> and <span>$10$</span>). This is suboptimal in the operations-level; the cutting plane added after iteration 1 helps iteration 2 reach a better solution. In iteration 2, the root subgraph chooses a storage size of <span>$10$</span> and a reactor size of <span>$50$</span>. This is a better solution but still suboptimal, and more cutting planes are added. At iteration 3, the root subgraph chooses a storage size of <span>$500$</span> and a reactor size of <span>$50$</span>. This is actually a worse solution than the previous iteration, and an additional cutting plane is again added. At iteration 4, the root subgraph chooses a storage size of <span>$50$</span> and a reactor size of <span>$50$</span>. This is in fact the optimal solution. However, we require one more iteration for the lower bound to converge. This is because the solution of the root subgraph yields a lower bound on the overall problem, but this root subgraph requires the cutting plane of the subproblem at iteration 4 before the lower bound converges to the optimal solution. </p><h2 id="Adding-extra-scenarios"><a class="docs-heading-anchor" href="#Adding-extra-scenarios">Adding extra scenarios</a><a id="Adding-extra-scenarios-1"></a><a class="docs-heading-anchor-permalink" href="#Adding-extra-scenarios" title="Permalink"></a></h2><p>This problem is relatively basic, but gives an idea of how PlasmoBenders can be applied. We could add complexity to this problem by making it <em>stochastic</em>. To do this, we could instead consider sizing the storage unit and the reactor size under different scenarios. We will create different demand and cost data and create subgraphs for each of these. In addition, we have to divide each scenario by the number of scenarios (this is assuming each scenario is equally likely, so this is just multiplying by each scenario&#39;s probability).</p><pre><code class="language-julia hljs"># Define two new scenarios of demand and costs
+cost2 = sin.(x .* 2 .* pi ./ 10 ) .* 2 .+ 15 .+ rand(Uniform(-1,1),31) .* .75
+demand2 = sin.(x .* 2 .* pi ./ 15 ) .* 30 .+ 90 .+ rand(Uniform(-1,1),31) .* 4.5
+
+cost3 = sin.(x .* 2 .* pi ./ 10 ) .* 2 .+ 8 .+ rand(Uniform(-1,1),31) .* .4
+demand3 = sin.(x .* 2 .* pi ./ 15 ) .* 30 .+ 80 .+ rand(Uniform(-1,1),31) .* 4
+
+# Define overall graph
+g = OptiGraph()
+
+# Define subgraphs for each scenario
+g1 = build_scenario_graph(cost1, demand1, 3)
+g2 = build_scenario_graph(cost2, demand2, 3)
+g3 = build_scenario_graph(cost3, demand3, 3)
+
+# Add subgraphs to the original graph
+add_subgraph!(g, g_root)
+add_subgraph!(g, g1)
+add_subgraph!(g, g2)
+add_subgraph!(g, g3)</code></pre><p>With these new subgraphs defined, we need to link the variables to the root graph. </p><pre><code class="language-julia hljs"># Link variables of scenario 2 to root graph
+@linkconstraint(g, [t = 1:T], g2[:n][t][:x_store] &lt;= g_root[:n_root][:storage_size])
+@linkconstraint(g, [t = 1:T], g2[:n][t][:x_buy] - g2[:n][t][:x_save] &lt;= g_root[:n_root][:reactor_size])
+
+# Link variables of scneario 3 to root graph
+@linkconstraint(g, [t = 1:T], g3[:n][t][:x_store] &lt;= g_root[:n_root][:storage_size])
+@linkconstraint(g, [t = 1:T], g3[:n][t][:x_buy] - g3[:n][t][:x_save] &lt;= g_root[:n_root][:reactor_size])</code></pre><p>We can now call the <code>BendersOptimizer</code> function and solve this problem as before. In addition, if desired, we could set additional solver options, such as <code>multicut = false</code> (this uses one extra iteration) or <code>regularize = true</code> (which decreases the number of required iterations by 1). </p><div class="admonition is-info"><header class="admonition-header">Note</header><div class="admonition-body"><p>PlasmoBenders currently does not create a copy of the graph that is passed to the optimizer. This means that the graph <code>g</code> can&#39;t be altered with adding <code>g2</code> and <code>g3</code> after the original <code>BendersOptimizer</code> object is created. Instead, a new graph must be created and a new <code>BendersOptimizer</code> object must be formed for running the stochastic case above. </p></div></div></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../storage_tutorial/">« Storage Operation</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.8.0 on <span class="colophon-date" title="Friday 27 December 2024 16:15">Friday 27 December 2024</span>. Using Julia version 1.6.7.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
