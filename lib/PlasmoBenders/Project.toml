@@ -11,6 +11,8 @@ Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
 
 [compat]
 julia = "1"
+JuMP = "1.2"
+MathOptInterface = "1.6"
 Plasmo = ">= 0.6.2"
 
 [extras]
