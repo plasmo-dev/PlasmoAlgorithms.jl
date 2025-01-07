@@ -1,6 +1,9 @@
 # PlasmoBenders.jl
 
-PlasmoBenders.jl implements Benders and Nested Benders decomposition to graph-based problems constructed in [Plasmo.jl](https://github.com/plasmo-dev/Plasmo.jl). After a user defines a graph in Plasmo.jl, they can pass the graph to PlasmoBenders.jl, set the root subgraph, and have PlasmoBenders apply Benders or Nested Benders decomposition to find a solution. These algorithms are applied *based on the user's model*, so algorithm performance is dependent in part on how the user constructed the problem in Plasmo.jl. Further, Benders and Nested Benders requires a specific structure (outlined below) which the user must supply. 
+[![](https://img.shields.io/badge/docs-dev-blue.svg)](https://plasmo-dev.github.io/PlasmoAlgorithms.jl/dev/PlasmoBenders/introduction/)
+
+
+PlasmoBenders.jl implements Benders and Nested Benders decomposition to graph-based problems constructed in [Plasmo.jl](https://github.com/plasmo-dev/Plasmo.jl). The algorithm used by this package is outlined by the manuscript [Graph-Based Modeling and Decomposition of Hierarchical Optimization Problems](https://arxiv.org/pdf/2501.02098). After a user defines a graph in Plasmo.jl, they can pass the graph to PlasmoBenders.jl, set the root subgraph, and have PlasmoBenders apply Benders or Nested Benders decomposition to find a solution. These algorithms are applied *based on the user's model*, so algorithm performance is dependent in part on how the user constructed the problem in Plasmo.jl. Further, Benders and Nested Benders requires a specific structure (outlined below) which the user must supply. 
 
 ### Installation
 
@@ -79,3 +82,14 @@ PlasmoBenders includes additional functionality. The following keyword arguments
  * `regularize` - whether to use a regularization scheme for choosing next solutions; currently only works for BD
  * `parallelize_benders` - whether to parallelize solutions of the subproblems in BD
 
+### Citing PlasmoBenders.jl
+
+If you find PlasmoBenders.jl useful for your work, you may cite the [preprint](https://arxiv.org/pdf/2501.02098) as:
+```
+@article{cole2025,
+  title={Graph-Based Modeling and Decomposition of Hierarchical Optimization Problems},
+  author={David L. Cole and Filippo Pecci and Omar J. Guerra and Harsha Gangammanavar and Jesse D. Jenkins and Victor M. Zavala},
+  journal={arXiv preprint arXiv:2501.02098},
+  year={2025}
+}
+```
