@@ -11,7 +11,7 @@ PlasmoBenders.jl can be installed using the following Julia Pkg command:
 
 ```julia
 using Pkg
-Pkg.add(PackageSpec(url="https://github.com/plasmo-dev/PlasmoAlgorithms.jl/lib/PlasmoBenders"))
+Pkg.add("PlasmoBenders")
 ```
 
 ### Overview
