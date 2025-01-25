@@ -1,7 +1,7 @@
 name = "PlasmoBenders"
 uuid = "491f1417-53b2-48aa-b9da-44cdd6c031b7"
 authors = ["David Cole"]
-version = "0.0.1"
+version = "0.0.2"
 
 [deps]
 Plasmo = "d3f7391f-f14a-50cc-bbe4-76a32d1bad3c"
