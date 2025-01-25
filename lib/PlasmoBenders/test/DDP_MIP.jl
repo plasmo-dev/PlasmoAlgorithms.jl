@@ -77,7 +77,18 @@ function test_DDP_MIP_initialization()
         @test DDPOpt.binary_map[subgraphs[i]][node[:x]] == 0
     end
 
-    @test DDPOpt.time_init > 0
+    # Test API
+    @test get_graph(DDPOpt) == graph
+    @test get_root_object(DDPOpt) == subgraphs[1]
+    @test get_max_iters(DDPOpt) == max_iters
+    @test get_tol(DDPOpt) == tol
+    @test get_time_forward_pass(DDPOpt) == 0
+    @test get_time_backward_pass(DDPOpt) == 0
+    @test get_time_init(DDPOpt) > 0
+    @test typeof(get_time_iterations(DDPOpt)) <: Vector
+    @test typeof(get_lower_bounds(DDPOpt)) <: Vector
+    @test typeof(get_upper_bounds(DDPOpt, monotonic = true)) <: Vector
+    @test typeof(get_upper_bounds(DDPOpt, monotonic = false)) <: Vector
 
     # Test options
     set_strengthened!(DDPOpt, true)
