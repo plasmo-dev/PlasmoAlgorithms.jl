@@ -331,9 +331,23 @@ _options_bool_fields = [
     :warm_start,
     :relaxed_init_cuts
 ]
+
 _options_real_fields = [
     :slack_penalty,
     :regularize_param
+]
+
+_algorithm_fields = [
+    :graph,
+    :root_object,
+    :is_MIP,
+    :max_iters,
+    :tol,
+    :time_forward_pass,
+    :time_backward_pass,
+    :time_init,
+    :time_iterations,
+    :lower_bounds,
 ]
 
 for field in union(_options_bool_fields, _options_real_fields)
@@ -346,6 +360,35 @@ for field in union(_options_bool_fields, _options_real_fields)
         $method(optimizer::BendersAlgorithm) = getproperty(optimizer.options, $(QuoteNode(field)))
     end
     @eval export $method
+end
+
+for field in _algorithm_fields
+    method = Symbol("get_", field)
+    @eval begin
+        @doc """
+            $($method)(optimizer::BendersAlgorithm)
+        Return the value of the $($(QuoteNode(field))) attribute from the `BendersAlgorithm`
+        """
+        $method(optimizer::BendersAlgorithm) = getproperty(optimizer, $(QuoteNode(field)))
+    end
+    @eval export $method
+end
+
+@doc """
+    get_upper_bounds(optimizer::BendersAlgorithm; monotonic = true)
+Return the value of `upper_bounds` from the `BendersAlgorithm` object. This is a vector of the upper bounds at each iteration. The upper bound returned by each iteration is not guaranteed to decrease monotonically. If `monotonic=true`, this function returns the best upper bound seen up to each iteration (rather than the value of the feasible solution seen at that iteration)
+"""
+function get_upper_bounds(optimizer::BendersAlgorithm; monotonic = true)
+    ubs = optimizer.upper_bounds
+    if monotonic
+        if optimizer.current_iter == 0
+            return ubs
+        else
+            return [minimum(ubs[1:i] for i in 1:length(ubs))]
+        end
+    else
+        return ubs
+    end
 end
 
 for field in _options_bool_fields
@@ -371,5 +414,3 @@ for field in _options_real_fields
     end
     @eval export $method
 end
-
-# TODO: Extend JuMP functions like termination status, objective value, etc.

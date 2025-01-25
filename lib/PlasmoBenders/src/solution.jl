@@ -65,7 +65,7 @@ function _add_Benders_cuts!(optimizer::BendersAlgorithm)
             if !(get_multicut(optimizer))
                 theta_vars = _get_theta(optimizer, last_object)
                 theta_expr = sum(theta_vars[k] for k in 1:length(theta_vars))
-                _add_cut_constraint!(optimizer, last_object, theta_expr, rhs_expr)
+                _add_cut_constraint!(optimizer, last_object, theta_expr, agg_rhs_expr)
             end
         end
     end

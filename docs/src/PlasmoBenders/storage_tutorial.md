@@ -70,7 +70,7 @@ partition = Plasmo.Partition(graph, node_membership_vector)
 
 apply_partition!(graph, partition)
 
-for subgraph in getsubgraphs(graph)
+for subgraph in local_subgraphs(graph)
     set_to_node_objectives(subgraph)
 end
 ```
@@ -81,13 +81,13 @@ The resulting problem can be visualized as:
 
 ## Solving with PlasmoBenders
 
-The subgraphs have a (linear) tree structure, so we can pass this graph to PlasmoBenders' `BendersOptimizer` constructor and solve it with Nested Benders Decomposition. This also requires setting a "root subgraph." We will set the first subgraph as the root subgraph, but any of the subgraphs could be used. 
+The subgraphs have a (linear) tree structure, so we can pass this graph to PlasmoBenders' `BendersAlgorithm` constructor and solve it with Nested Benders Decomposition. This also requires setting a "root subgraph." We will set the first subgraph as the root subgraph, but any of the subgraphs could be used. 
 
 ```julia
 solver = optimizer_with_attributes(HiGHS.Optimizer, "output_flag" => false)
 
-root_graph = getsubgraphs(graph)[1]
-BendersOptimizer(graph, root_graph, solver = solver)
+root_graph = local_subgraphs(graph)[1]
+BendersAlgorithm(graph, root_graph, solver = solver)
 ```
 
 The Nested Benders scheme is able to reach the optimal solution after 5 iterations. The bounds and gap are shown below.
@@ -98,7 +98,7 @@ Note that the first iteration returns an upper bound that is well above the opti
 
 ## Querying Solutions
 
-PlasmoBenders provides access to API functions for querying the optimal solution from the BendersOptimizer object. We can query the solution by calling 
+PlasmoBenders provides access to API functions for querying the optimal solution from the BendersAlgorithm object. We can query the solution by calling 
 ```julia
 JuMP.objective_value(benders_opt)
 ```
