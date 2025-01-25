@@ -17,7 +17,7 @@ The example below is a simplified problem where we need to choose the size of a 
     &\; r_{size} = \sum_{i \in N} z^r_i \lambda^{reactor}_i, \quad \sum_{i \in N} z^r_i = 1 \\ 
     &\; 0 \le x^{store}_t \le s_{size}, \quad t = 1, ..., T \\
     &\; 0 \le x^{buy}_t - x^{save}_t \le r_{size}, \quad t = 1, ..., T\\
-    &\; 0 \le x^{sell}_t \le \overline{d}^{sell}, \quad t = 1, ..., T \\
+    &\; 0 \le y^{product}_t \le \overline{d}^{sell}, \quad t = 1, ..., T \\
     &\; \underline{d}^{save} \le x^{save}_t \le \overline{d}^{save}, \quad t = 1, ..., T \\
     &\; x^{store}_1 = \bar{x}^{store}
 \end{align*}
