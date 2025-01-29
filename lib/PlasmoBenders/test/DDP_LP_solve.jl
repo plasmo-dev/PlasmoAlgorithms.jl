@@ -2,7 +2,7 @@ module TestDDP_LP_solves
 
     using Plasmo, HiGHS, JuMP, PlasmoBenders, Test
 
-    function build_graph()
+    function build_graph(single_objective = false)
         solver = optimizer_with_attributes(HiGHS.Optimizer, "output_flag" => false)
         graph = OptiGraph()
         set_optimizer(graph, solver)
@@ -14,7 +14,11 @@ module TestDDP_LP_solves
             @variable(node, y >= 0)
             @constraint(node, x + y >= 1.3)
 
-            @objective(node, Min, x + 2 * y)
+            if single_objective
+                @objective(node, Min, x)
+            else
+                @objective(node, Min, x + 2 * y)
+            end
         end
 
         for i in 1:2
@@ -50,6 +54,16 @@ module TestDDP_LP_solves
     DDPOpt = BendersAlgorithm(gtest, local_subgraphs(gtest)[1], max_iters = 20);
     run_algorithm!(DDPOpt)
     @test isapprox(DDPOpt.best_upper_bound, 5.5, rtol = 1e-6)
+
+    gtest = build_graph(true)
+    DDPOpt = BendersAlgorithm(gtest, local_subgraphs(gtest)[1], max_iters = 20, add_slacks = true);
+    run_algorithm!(DDPOpt)
+    @test isapprox(DDPOpt.best_upper_bound, 0, rtol = 1e-6)
+
+    gtest = build_graph(true)
+    DDPOpt = BendersAlgorithm(gtest, local_subgraphs(gtest)[1], max_iters = 20, add_slacks = false);
+    run_algorithm!(DDPOpt)
+    @test isapprox(DDPOpt.best_upper_bound, 0, rtol = 1e-6)
 
     gtest = build_graph()
     DDPOpt = BendersAlgorithm(gtest, local_subgraphs(gtest)[1], max_iters = 20, multicut = true);
