@@ -157,7 +157,7 @@ function _add_slack_to_node(optimizer::BendersAlgorithm, next_object, node::Plas
 
     # Ensure the objective is an Affine Expression
     if typeof(obj_func) == NodeVariableRef
-        obj_func = AffExpr(0, obj_func => 1)
+        obj_func = GenericAffExpr{Float64, Plasmo.NodeVariableRef}(0, obj_func => 1)
     end
 
     # Add the slacks to the objective function
@@ -194,7 +194,7 @@ function _add_slack_to_node_for_links(optimizer::BendersAlgorithm, next_object::
 
     # Ensure the objective is an Affine Expression
     if typeof(obj_func) == NodeVariableRef
-        obj_func = AffExpr(0, obj_func => 1)
+        obj_func = GenericAffExpr{Float64, Plasmo.NodeVariableRef}(0, obj_func => 1)
     end
 
     # Add the slacks to the objective function
