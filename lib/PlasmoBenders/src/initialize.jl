@@ -126,7 +126,7 @@ function _add_complicating_variables!(
 
     complicating_edges = intersect(last_object_optiedges, next_object_optiedges)
 
-    link_vars = NodeVariableRef[]
+    comp_vars = NodeVariableRef[]
 
     # Map complicating variables to their owning node and vice versa
     node_to_var = Dict{Plasmo.OptiNode, Vector{NodeVariableRef}}()
@@ -140,22 +140,21 @@ function _add_complicating_variables!(
             con_obj = constraint_object(link)
             vars = con_obj.func.terms.keys
 
-            union!(link_vars, vars)
-
-            next_vars = intersect(next_object_vars, vars)
-            last_vars = intersect(last_object_vars, vars)
+            next_object_link_vars = [var for var in vars if source_graph(JuMP.owner_model(var)) == next_object]
+            last_object_link_vars = [var for var in vars if source_graph(JuMP.owner_model(var)) == last_object]
 
             # Get the optinodes containing the next set of variables
             #next_optinode = optinode(next_object_vars[1]) #NEXT: Fix this!
 
-            next_object_link_vars = intersect(next_vars, vars)
             # Get the set of nodes in the next_object that are included in the constraint
-            #next_optinodes = unique(optinode.(next_object_link_vars))
             next_optinode = JuMP.owner_model(next_object_link_vars[1])
 
             # Map each complicating variable to the node where the
             # complicating variable copy will live
-            for (k, var) in enumerate(last_vars)
+            for (k, var) in enumerate(last_object_link_vars)
+                if !(var in comp_vars)
+                    push!(comp_vars, var)
+                end
                 if haskey(var_to_node, var)
                     continue
                 else
@@ -172,7 +171,6 @@ function _add_complicating_variables!(
     end
 
     # Get the set of all complicating variables on last object
-    comp_vars = intersect(last_object_vars, link_vars)
     comp_var_map = Dict{NodeVariableRef, Int}()
 
     # Map complicating variables to their index
@@ -240,8 +238,8 @@ function _add_complicating_variables!(
             vars = con_obj.func.terms.keys
 
             # Get the variables from the constraint in the next_object
-            next_object_link_vars = intersect(next_object_vars, vars)
-            last_object_link_vars = intersect(last_object_vars, vars)
+            next_object_link_vars = [var for var in vars if source_graph(JuMP.owner_model(var)) == next_object]#intersect(next_object_vars, vars)
+            last_object_link_vars = [var for var in vars if source_graph(JuMP.owner_model(var)) == last_object]#intersect(last_object_vars, vars)
             next_object_copy_vars = [var_copy_map[var] for var in last_object_link_vars]
 
             # Get the set of nodes in the next_object that are included in the constraint
