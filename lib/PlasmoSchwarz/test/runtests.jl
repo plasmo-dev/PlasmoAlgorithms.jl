@@ -1,6 +1,6 @@
-using SchwarzOpt
+using PlasmoSchwarz
 using Test
 
-@testset "SchwarzOpt.jl" begin
+@testset "PlasmoSchwarz.jl" begin
     include("test_optimizer.jl")
 end
