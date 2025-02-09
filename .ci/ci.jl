@@ -12,7 +12,7 @@ using Pkg
 Pkg.activate(@__DIR__)
 
 # if other packages are added to lib, this file can be updated with those package names
-pkgs = ["PlasmoBenders"]
+pkgs = ["PlasmoBenders", "PlasmoSchwarz"]
 
 Pkg.develop.([PackageSpec(path=joinpath(@__DIR__,"..","lib",pkg)) for pkg in pkgs])
 Pkg.build()

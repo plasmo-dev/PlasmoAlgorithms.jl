@@ -16,12 +16,12 @@ PlasmoBenders supports several different solver options. These are keyword argum
  * `tol::Real` - The relative tolerance between the upper and lower bounds to reach before termination. 
  * `solver` - The subproblem solver to use. If this is not set, it will assume that the user has set a solver on all subgraphs. 
  * `M::Real` - Lower bound on all cost-to-go variables. Default value is $0$. At the first iteration of the BD and Nested Benders Decomposition, theta is otherwise unconstrained, so this value ensures that the cost-to-variable is bounded. 
- * `is_MIP::Bool` - Whether the problem includes mixed integer variables in the subproblems. If the user does not set this value, the `BendersOptimizer` constructor will detect this value by testing all subgraphs that are not the root subgraph (note that the root subgraph can have mixed integer variables and still set `is_MIP` to `false`). This argument determines when the backward pass occurs. For LPs, the backward pass can occur at the same time as the forward pass, but for MILPs, the backward pass is performed separately (and can be parallelized). 
+ * `is_MIP::Bool` - Whether the problem includes mixed integer variables in the subproblems. If the user does not set this value, the `BendersAlgorithm` constructor will detect this value by testing all subgraphs that are not the root subgraph (note that the root subgraph can have mixed integer variables and still set `is_MIP` to `false`). This argument determines when the backward pass occurs. For LPs, the backward pass can occur at the same time as the forward pass, but for MILPs, the backward pass is performed separately (and can be parallelized). 
  
 !!! note
     If the objective value of a subproblem can be negative, it is important to set `M` to be less than zero. Otherwise, you can get lower bounds that are greater than upper bounds and the algorithm will not work. 
 
-The `JuMP.optimize!` function has been extended to solve a `BendersOptimizer` object. There are two additional keyword arguments you can set with `JuMP.optimize!`
+The `run_algorithm!` solves a `BendersAlgorithm` object. There are two additional keyword arguments you can set with `run_algorithm!`
  * `output::Bool` - Whether to output the upper and lower bounds and the gap at each iteration of the algorithm
  * `run_gc::Bool` - Whether to run the garbage collector at the end of each iteration. Could potentially help with some memory issues. 
     
