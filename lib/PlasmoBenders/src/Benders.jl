@@ -16,12 +16,13 @@ Attributes include
  - `strengthened::Bool` - whether to use strengthened cuts
  - `multicut::Bool` - whether the problem should use aggregated or multiple cuts when
    there are multiple objects generating information in the forward pass
+ - `feasibility_cuts::Bool` - whether to allow feasibility cuts if infeasible
  - `regularize::Bool` - whether to used regularization for getting next cuts
  - `parallelize_benders::Bool` - whether to parallelize Benders problems if applicable
  - `parallelize_forward::Bool` - whether to parallelize the forward pass if possible
  - `parallelize_backward::Bool` - whether to parallelize the backward pass if possible
  - `add_slacks::Bool` - whether to add slack variables to linking constraints
- - `fix_slacks::Bool` - whether to fix the slack variables to zero; slacks will be relaxe
+ - `fix_slacks::Bool` - whether to fix the slack variables to zero; slacks will be relaxed
    if the problem is infeasible
  - `warm_start::Bool` - whether to warm start the problem using the previous best solution
  - `relaxed_init_cuts::Bool` - whether to create some initial cuts by relaxing the problem
@@ -33,6 +34,7 @@ Attributes include
 mutable struct BendersOptions <: AbstractPBOptions
     strengthened::Bool
     multicut::Bool
+    feasibility_cuts::Bool
     regularize::Bool
     parallelize_benders::Bool
     parallelize_forward::Bool
@@ -50,6 +52,7 @@ mutable struct BendersOptions <: AbstractPBOptions
 
         options.strengthened = false
         options.multicut = false
+        options.feasibility_cuts = false
         options.regularize = false
         options.parallelize_benders = false
         options.parallelize_forward = false
@@ -71,7 +74,7 @@ end
 
 Data structure for storing regularization data
 
-All attributes include a dictionary which is indexed by the subproblem objects of DDP
+All attributes include a dictionary which is indexed by the subproblem objects of Benders
  - `objective_function` - the objective function of an object
  - `ubs` - value of the object's objective (without theta)
  - `lbs` - value of the object's objective (with theta)
@@ -101,16 +104,17 @@ end
 Optimizer object for dual dynamic programming with graphs. Currently only implemented for linear tree structures.
 
 Attributes include the following (where noted as dictionaries, these are mappings from the
-DDP subproblems to the data described)
- - `graph` - Plasmo OptiGraph for appplying DDP
- - `root_object` - node or subgraph in `graph` indicating where to start the DDP algorithm
+Benders subproblems to the data described)
+ - `graph` - Plasmo OptiGraph for appplying Benders
+ - `root_object` - node or subgraph in `graph` indicating where to start the Benders algorithm
  - `is_MIP` = Boolean indicating if the problem is a MIP or not
- - `solve_order` - vector of OptiNodes in the order that they are solved by DDP
+ - `solve_order` - vector of OptiNodes in the order that they are solved by Benders
  - `solve_order_dict` - dictionary mapping to a vector of all the "next objects" for a given object
  - `parent_objects` - dictionary mapping to the previous subproblem
- - `max_iters` - maximum number of DDP iterations
+ - `max_iters` - maximum number of Benders iterations
+ - `max_time` - maximum time (seconds) allowed for running Benders
  - `tol` - (absolute) termination tolerance between upper and lower bounds
- - `current_iter` - current iteration of DDP algorithm
+ - `current_iter` - current iteration of Benders algorithm
  - `M` - lower bound for the cost-to-go function at each iteration
  - `dual_iters` - dictionary mapping optinodes to the corresponding dual values
     at each iteration; dual values come from solution of following node
@@ -137,7 +141,7 @@ DDP subproblems to the data described)
  - `last_solutions` - dictionary mapping the nodes to a vector of the last solutions
  - `var_solution_map` - dictionary mapping the variables to their index on the `last_solutions` vector
  - `var_to_graph_map` - dictionary mapping the variables to their owning subproblem subgraph
- - `options` - solver options for DDP algorithm
+ - `options` - solver options for Benders algorithm
  - `ext` - Dictionary for extending certain procedures
 """
 mutable struct BendersAlgorithm{T} <: AbstractPBAlgorithm{T}
@@ -150,6 +154,7 @@ mutable struct BendersAlgorithm{T} <: AbstractPBAlgorithm{T}
     parent_objects::Dict{T, T}
 
     max_iters::Int
+    max_time::Real
     tol::Real
     current_iter::Int
     M::Real
@@ -200,6 +205,7 @@ mutable struct BendersAlgorithm{T} <: AbstractPBAlgorithm{T}
         optimizer.parent_objects = Dict{T, T}()
 
         optimizer.max_iters = 0
+        optimizer.max_time = Inf
         optimizer.tol = 0.
         optimizer.current_iter = 0
         optimizer.M = 0.
@@ -257,6 +263,7 @@ OptiNode or subgraph on `graph`. key ward arguments include the following
  - `solver = nothing` - if defined, this solver will be set for all subproblems
  - `strengthened = false` - whether to use strengthened Benders cuts (see https://doi.org/10.1007/s10107-018-1249-5.)
  - `multicut = true` - whether to use multicuts (rather than aggregated cuts) when applicable
+ - `feasibility_cuts = false` - whether to allow feasibility cuts
  - `regularize = false` - whether to regularize solution of next iterates
  - `parallelize_benders = false` - whether to parallelize subproblem solution when the problem
    has a Benders-type structure defined
@@ -314,6 +321,7 @@ function BendersAlgorithm(
     solver = nothing,
     strengthened::Bool = false,
     multicut::Bool = true,
+    feasibility_cuts::Bool = false,
     regularize::Bool = false,
     parallelize_benders::Bool = false,
     parallelize_forward::Bool = false,
@@ -341,6 +349,7 @@ function BendersAlgorithm(
 
         set_strengthened!(optimizer, strengthened)
         set_multicut!(optimizer, multicut)
+        set_feasibility_cuts!(optimizer, feasibility_cuts)
         set_regularize!(optimizer, regularize)
         set_parallelize_benders!(optimizer, parallelize_benders)
         set_parallelize_forward!(optimizer, parallelize_forward)
@@ -354,7 +363,13 @@ function BendersAlgorithm(
         set_regularize_param!(optimizer, regularize_param)
 
         if parallelize_forward
-            @warn("`parallelize_forward` is not yet supported. DDP will run, but the forward pass will not be parallelized")
+            @warn("`parallelize_forward` is not yet supported. Benders will run, but the forward pass will not be parallelized")
+        end
+        if feasibility_cuts
+            @warn(
+                "`feasibility_cuts` have been implemented but are still under development." *
+                "If you experience bugs, please report them in the package's github issue tracker"
+            )
         end
         if get_regularize(optimizer)
             if regularize_param < 0 || regularize_param > 1
@@ -362,8 +377,12 @@ function BendersAlgorithm(
             end
         end
         if get_regularize(optimizer) && get_warm_start(optimizer)
-            @warn("Regularize and warm start cannot both be true; setting warm start to false")
+            @warn("`regularize` and `warm_start` cannot both be true; setting `warm_start` to false")
             set_warm_start!(optimizer, false)
+        end
+        if !(get_multicut(optimizer)) && get_feasibility_cuts(optimizer)
+            @warn("`multicut` cannot be false while `feasibility_cuts`` is true; setting `multicut` to true")
+            set_multi_cut!(optimizer, true)
         end
 
         # Set initial data
@@ -378,6 +397,10 @@ function BendersAlgorithm(
         else
             optimizer.is_MIP = is_MIP
         end
+
+        #if feasibility_cuts && optimizer.is_MIP
+        #    error("Feasibility Cuts are not implemented for problems with integer variables in the second stage")
+        #end
 
         # Set solver if it is defined
         if !isnothing(solver)
@@ -410,7 +433,7 @@ function BendersAlgorithm(
             _add_next_object!(optimizer, parent_object, search_next, get_relaxed_init_cuts(optimizer))
         end
 
-        _check_parallelize_Benders(optimizer)
+        _check_two_stage_tree(optimizer)
 
         # Check to make sure all objects have been added to the solve_order vector
         if length(intersect(_get_objects(optimizer), optimizer.solve_order)) != length(_get_objects(optimizer))
@@ -483,7 +506,7 @@ end
 """
     run_algorithm!(optimizer::PB.BendersAlgorithm; output::Bool = true, run_gc::Bool = false)
 
-Optimize the graph in BendersAlgorithm by using the DDP algorithm. Keyword argument `output`
+Optimize the graph in BendersAlgorithm by using the Benders algorithm. Keyword argument `output`
 indicates whether to print the upper/lower bounds and gap and each iteraiton. `run_gc` indicates
 whether to run the garbage collector after each iteraiton. 
 """
@@ -587,6 +610,10 @@ function run_algorithm!(
             println("Optimal Solution Found!")
             return nothing
         end
+
+        if sum(optimizer.time_iterations) > optimizer.max_time
+            break
+        end
     end
 
     # Upper/lower bounds
@@ -598,7 +625,11 @@ function run_algorithm!(
     optimizer.objective_value = optimizer.best_upper_bound
 
     # Return maximum number of iterations reached
-    println("Maximum Number of Iterations Exceeded")
+    if sum(optimizer.time_iterations) > optimizer.max_time
+        println("Maximum Time Limit of $(optimizer.max_time) s Exceeded")
+    else
+        println("Maximum Number of Iterations Exceeded")
+    end
     println("Optimality Gap at Termination was ", err)
     return nothing
 end
@@ -606,7 +637,7 @@ end
 """
     _forward_pass!(optimizer::BendersAlgorithm)
 
-Runs the forward pass for DDP. Follows the node order in `solve_order` attribute. Save the
+Runs the forward pass for Benders. Follows the node order in `solve_order` attribute. Save the
 primal information for complicating variables on each node. If it is not a MIP, also saves
 the dual and objective value information and adds the Benders cut. Returns the upper and
 lower bounds, where lower bound is only valid if the problem is not a MIP (otherwise the lower
@@ -616,12 +647,9 @@ function _forward_pass!(optimizer::BendersAlgorithm)
     ########## Solve the first node ############
     root_object = optimizer.solve_order[1]
 
-    opt_time = @elapsed JuMP.optimize!(root_object)
-    #println()
-    #println()
-    #println("Optimization time = ", opt_time)
-    # Test the termination status
-    _check_termination_status(optimizer, root_object, 1)
+    JuMP.optimize!(root_object)
+
+    root_object_feasibility = _check_termination_status(optimizer, root_object, 1)
 
     # Get initial objective
     root_objective = JuMP.objective_value(root_object)
@@ -666,52 +694,7 @@ function _forward_pass!(optimizer::BendersAlgorithm)
 
     ############### if it is not a MIP, do the backward pass now ###################
     if !optimizer.is_MIP
-        for i in 1:(length(optimizer.solve_order) - 1)
-            last_object = optimizer.solve_order[i]
-            next_objects = optimizer.solve_order_dict[last_object]
-
-            if length(next_objects) > 0
-                agg_rhs_expr = GenericAffExpr{Float64, Plasmo.NodeVariableRef}()
-
-                for (j, object) in enumerate(next_objects)
-                    rhs_expr = GenericAffExpr{Float64, Plasmo.NodeVariableRef}()
-
-                    # Complicating variables are on previous object
-                    comp_vars = optimizer.comp_vars[object]
-
-                    # Phi is the solution of the previous object
-                    phis = optimizer.phis[object]
-                    next_phi = phis[length(phis)]
-
-                    # Values of the complicating variables at last iteration
-                    primal_iters = optimizer.primal_iters[object]
-                    last_primals = primal_iters[:, size(primal_iters, 2)]
-
-                    # Dual variables come from the linking of complicating variables to the next object
-                    dual_iters = optimizer.dual_iters[object]
-                    next_duals = dual_iters[:, size(dual_iters, 2)]
-
-                    add_to_expression!(rhs_expr, next_phi)
-                    for k in 1:length(comp_vars)
-                        add_to_expression!(rhs_expr, next_duals[k] * (comp_vars[k] - last_primals[k]))
-                    end
-
-                    if get_multicut(optimizer)
-                        theta_var = _get_theta(optimizer, last_object, j)
-                        _add_cut_constraint!(optimizer, last_object, theta_var, rhs_expr)
-                    else
-                        add_to_expression!(agg_rhs_expr, rhs_expr)
-                    end
-
-                end
-
-                if !(get_multicut(optimizer))
-                    theta_vars = _get_theta(optimizer, last_object)
-                    theta_expr = sum(theta_vars[k] for k in 1:length(theta_vars))
-                    _add_cut_constraint!(optimizer, last_object, theta_expr, agg_rhs_expr)
-                end
-            end
-        end
+        _add_Benders_cuts!(optimizer)
     end
 
     return ub[1], lb[1]
