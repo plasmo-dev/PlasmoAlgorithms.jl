@@ -112,7 +112,7 @@ Benders subproblems to the data described)
  - `solve_order_dict` - dictionary mapping to a vector of all the "next objects" for a given object
  - `parent_objects` - dictionary mapping to the previous subproblem
  - `max_iters` - maximum number of Benders iterations
- - `max_time` - maximum time (seconds) allowed for running Benders
+ - `time_limit` - maximum time (seconds) allowed for running Benders
  - `tol` - (absolute) termination tolerance between upper and lower bounds
  - `current_iter` - current iteration of Benders algorithm
  - `M` - lower bound for the cost-to-go function at each iteration
@@ -154,7 +154,7 @@ mutable struct BendersAlgorithm{T} <: AbstractPBAlgorithm{T}
     parent_objects::Dict{T, T}
 
     max_iters::Int
-    max_time::Real
+    time_limit::Real
     tol::Real
     current_iter::Int
     M::Real
@@ -206,7 +206,7 @@ mutable struct BendersAlgorithm{T} <: AbstractPBAlgorithm{T}
         optimizer.parent_objects = Dict{T, T}()
 
         optimizer.max_iters = 0
-        optimizer.max_time = Inf
+        optimizer.time_limit = Inf
         optimizer.tol = 0.
         optimizer.current_iter = 0
         optimizer.M = 0.
@@ -317,7 +317,7 @@ function BendersAlgorithm(
     graph::Plasmo.OptiGraph,
     root_object::T;
     max_iters = 100,
-    max_time = Inf,
+    time_limit = Inf,
     tol::Float64 = 1e-7,
     M = 0.,
     is_MIP = nothing,
@@ -391,7 +391,7 @@ function BendersAlgorithm(
         # Set initial data
         optimizer.root_object = root_object
         optimizer.max_iters = max_iters
-        optimizer.max_time = max_time
+        optimizer.time_limit = time_limit
         optimizer.tol = tol
         optimizer.M = M
 
@@ -616,7 +616,7 @@ function run_algorithm!(
             return nothing
         end
 
-        if sum(optimizer.time_iterations) > optimizer.max_time
+        if sum(optimizer.time_iterations) > optimizer.time_limit
             optimizer.status = MOI.TIME_LIMIT
             break
         end
@@ -631,8 +631,8 @@ function run_algorithm!(
     optimizer.objective_value = optimizer.best_upper_bound
 
     # Return maximum number of iterations reached
-    if sum(optimizer.time_iterations) > optimizer.max_time
-        println("Maximum Time Limit of $(optimizer.max_time) s Exceeded")
+    if sum(optimizer.time_iterations) > optimizer.time_limit
+        println("Maximum Time Limit of $(optimizer.time_limit) s Exceeded")
     else
         optimizer.status = MOI.ITERATION_LIMIT
         println("Maximum Number of Iterations Exceeded")

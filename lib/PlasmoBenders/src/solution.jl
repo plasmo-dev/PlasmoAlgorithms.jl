@@ -199,7 +199,8 @@ function _save_forward_pass_solutions(optimizer, next_object, ub)
 end
 
 function _save_feasibility_cut_data(optimizer, next_object, ub)
-    # Add to the upper bound; if it's not the last object, subtract the cost-to-go from upper bound
+    # See JuMP documentation for implementation of this method:
+    # https://jump.dev/JuMP.jl/stable/tutorials/algorithms/benders_decomposition/#Feasibility-cuts
     obj_val = JuMP.dual_objective_value(next_object)
 
     next_objects = optimizer.solve_order_dict[next_object]

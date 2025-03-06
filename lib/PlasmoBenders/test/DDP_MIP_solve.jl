@@ -46,40 +46,42 @@ module TestDDP_MIP_solves
         return gap
     end
 
-    gtest = build_graph()
-    DDPOpt = BendersAlgorithm(gtest, local_subgraphs(gtest)[1], max_iters = 20);
-    run_algorithm!(DDPOpt)
-    @test isapprox(DDPOpt.best_upper_bound, 5.8, rtol = 1e-6)
+    function test_graphs()
+        gtest = build_graph()
+        DDPOpt = BendersAlgorithm(gtest, local_subgraphs(gtest)[1], max_iters = 20);
+        run_algorithm!(DDPOpt)
+        @test isapprox(DDPOpt.best_upper_bound, 5.8, rtol = 1e-6)
 
-    gtest = build_graph()
-    DDPOpt = BendersAlgorithm(gtest, local_subgraphs(gtest)[1], max_iters = 20, strengthened = true);
-    run_algorithm!(DDPOpt)
-    @test isapprox(DDPOpt.best_upper_bound, 5.8, rtol = 1e-6)
-    @test isapprox(get_gap(DDPOpt), 0, rtol = 1e-6)
+        gtest = build_graph()
+        DDPOpt = BendersAlgorithm(gtest, local_subgraphs(gtest)[1], max_iters = 20, strengthened = true);
+        run_algorithm!(DDPOpt)
+        @test isapprox(DDPOpt.best_upper_bound, 5.8, rtol = 1e-6)
+        @test isapprox(get_gap(DDPOpt), 0, rtol = 1e-6)
 
-    gtest = build_graph()
-    DDPOpt = BendersAlgorithm(gtest, local_subgraphs(gtest)[1], max_iters = 20, strengthened = true, multicut = true);
-    run_algorithm!(DDPOpt)
-    @test isapprox(DDPOpt.best_upper_bound, 5.8, rtol = 1e-6)
-    @test isapprox(get_gap(DDPOpt), 0, rtol = 1e-6)
+        gtest = build_graph()
+        DDPOpt = BendersAlgorithm(gtest, local_subgraphs(gtest)[1], max_iters = 20, strengthened = true, multicut = true);
+        run_algorithm!(DDPOpt)
+        @test isapprox(DDPOpt.best_upper_bound, 5.8, rtol = 1e-6)
+        @test isapprox(get_gap(DDPOpt), 0, rtol = 1e-6)
 
-    gtest = build_graph()
-    DDPOpt = BendersAlgorithm(gtest, local_subgraphs(gtest)[1], max_iters = 20, strengthened = true, multicut = true, regularize = false, parallelize_backward = true
-    );
-    run_algorithm!(DDPOpt)
-    @test isapprox(DDPOpt.best_upper_bound, 5.8, rtol = 1e-6)
-    @test isapprox(get_gap(DDPOpt), 0, rtol = 1e-6)
+        gtest = build_graph()
+        DDPOpt = BendersAlgorithm(gtest, local_subgraphs(gtest)[1], max_iters = 20, strengthened = true, multicut = true, regularize = false, parallelize_backward = true
+        );
+        run_algorithm!(DDPOpt)
+        @test isapprox(DDPOpt.best_upper_bound, 5.8, rtol = 1e-6)
+        @test isapprox(get_gap(DDPOpt), 0, rtol = 1e-6)
+    end
 
-function run_tests()
-    for name in names(@__MODULE__; all=true)
-        if !startswith("$(name)", "test_")
-            continue
-        end
-        @testset "$(name)" begin
-            getfield(@__MODULE__, name)()
+    function run_tests()
+        for name in names(@__MODULE__; all=true)
+            if !startswith("$(name)", "test_")
+                continue
+            end
+            @testset "$(name)" begin
+                getfield(@__MODULE__, name)()
+            end
         end
     end
-end
 
 end
 
