@@ -151,7 +151,7 @@ T = length(all_nodes(g1))
 
 ## Solving with PlasmoBenders
 
-The subgraphs of this problem form a tree structure (two subgraphs with edges connecting them), so we can now apply BD via PlasmoBenders. We will create the [`BendersAlgorithm`](@ref) object by calling 
+The subgraphs of this problem form a tree structure (two subgraphs with edges connecting them), so we can now apply BD via PlasmoBenders. We will create the `BendersAlgorithm` object by calling 
 
 ```julia
 # Define a subproblem object to use for the subgraphs
@@ -161,7 +161,7 @@ solver = optimizer_with_attributes(HiGHS.Optimizer, "output_flag" => false)
 benders_alg = BendersAlgorithm(g, g_root, solver = solver)
 ```
 
-The [`BendersAlgorithm`](@ref) object can now be solved by calling 
+The `BendersAlgorithm` object can now be solved by calling 
 ```julia
 run_algorithm!(benders_alg)
 ```
@@ -211,7 +211,7 @@ With these new subgraphs defined, we need to link the variables to the root grap
 @linkconstraint(g, [t = 1:T], g3[:n][t][:x_buy] - g3[:n][t][:x_save] <= g_root[:n_root][:reactor_size])
 ```
 
-We can now call the [`BendersAlgorithm`](@ref) function and solve this problem as before. In addition, if desired, we could set additional solver options, such as `multicut = false` (this uses one extra iteration) or `regularize = true` (which decreases the number of required iterations by 1). 
+We can now call the `BendersAlgorithm` function and solve this problem as before. In addition, if desired, we could set additional solver options, such as `multicut = false` (this uses one extra iteration) or `regularize = true` (which decreases the number of required iterations by 1). 
 
 !!! note
-    PlasmoBenders currently does not create a copy of the graph that is passed to the optimizer. This means that the graph `g` can't be altered with adding `g2` and `g3` after the original [`BendersAlgorithm`](@ref) object is created. Instead, a new graph must be created and a new [`BendersAlgorithm`](@ref) object must be formed for running the stochastic case above. 
+    PlasmoBenders currently does not create a copy of the graph that is passed to the optimizer. This means that the graph `g` can't be altered with adding `g2` and `g3` after the original `BendersAlgorithm` object is created. Instead, a new graph must be created and a new `BendersAlgorithm` object must be formed for running the stochastic case above. 

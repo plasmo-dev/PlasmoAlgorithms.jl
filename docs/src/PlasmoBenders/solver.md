@@ -22,7 +22,7 @@ PlasmoBenders supports several different solver options. These are keyword argum
 !!! note
     If the objective value of a subproblem can be negative, it is important to set `M` to be less than zero. Otherwise, you can get lower bounds that are greater than upper bounds and the algorithm will not work. 
 
-The [`run_algorithm!`](@ref) solves a [`BendersAlgorithm`](@ref) object. There are two additional keyword arguments you can set with [`run_algorithm!`](@ref)
+The `run_algorithm!` solves a `BendersAlgorithm` object. There are two additional keyword arguments you can set with `run_algorithm!`
  * `output::Bool` - Whether to output the upper and lower bounds and the gap at each iteration of the algorithm
  * `run_gc::Bool` - Whether to run the garbage collector at the end of each iteration. Could potentially help with some memory issues. 
  
