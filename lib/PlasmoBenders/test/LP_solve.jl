@@ -1,4 +1,4 @@
-module TestDDP_LP_solves
+module Test_LP_solves
 
 using Plasmo, HiGHS, JuMP, PlasmoBenders, Test
 
@@ -111,4 +111,4 @@ end
 
 end
 
-TestDDP_LP_solves.run_tests()
+Test_LP_solves.run_tests()

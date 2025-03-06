@@ -1,4 +1,4 @@
-module TestDDP_MIP_solves
+module Test_MIP_solves
 
     using Plasmo, HiGHS, JuMP, PlasmoBenders, Test
 
@@ -85,4 +85,4 @@ module TestDDP_MIP_solves
 
 end
 
-TestDDP_MIP_solves.run_tests()
+Test_MIP_solves.run_tests()

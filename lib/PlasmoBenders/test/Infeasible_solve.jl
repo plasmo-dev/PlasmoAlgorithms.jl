@@ -1,4 +1,4 @@
-module TestDDP_Infeasible
+module Test_Infeasible
 using Plasmo, HiGHS, JuMP, PlasmoBenders, Test
 
 function build_graph(MILP = false)
@@ -61,4 +61,4 @@ end
 end
 
 
-TestDDP_Infeasible.run_tests()
+Test_Infeasible.run_tests()
