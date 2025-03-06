@@ -2,6 +2,7 @@
 PlasmoBenders supports several different solver options. These are keyword arguments that can be  These include the following: 
  * `strengthened::Bool` - whether to use "strengthened" Benders cuts for MILP problems. These cuts are outlined [here](https://link.springer.com/article/10.1007/s10107-018-1249-5) and [here](https://www.sciencedirect.com/science/article/pii/S0377221718304466). They add some computational time to the algorithm but can result in tighter cuts (and thus fewer iterations or a smaller duality gap) being added to the subproblems. This only applies if there are integer variables in the subproblems (not just the root subgraph). Currently, these only work for MILP problems, not for LP problems.
  * `multicut::Bool` - Whether to use multi-cuts (instead of aggregated cuts). When a subproblem has multiple children subgraphs (i.e., is connected to multiple subproblems in the next stage), you can use either an aggregated cut (where there is a single cost-to-go variable) or multi-cuts, where each child subproblem has its own corresponding cost-to-go function. Multi-cuts result in more cutting planes being added at each iteration, but aggregated cuts result in fewer overall constraints being added. 
+ * `feasibility_cuts::Bool` - Whether to allow for feasibility cuts. These are implemented following [JuMP.jl's documentation](https://jump.dev/JuMP.jl/stable/tutorials/algorithms/benders_decomposition/#Feasibility-cuts) and are currently only implemented for two-stage problems for LP or MILP problems. These cuts are added when the second stage subproblem(s) are infeasible, and they require using `multicut = true`. 
  * `regularize::Bool` - Whether to use a regularization scheme to choose the solutions passed to the next stage. PlasmoBenders implements the regularization scheme from [here](https://arxiv.org/abs/2403.02559). The regularization only works for Benders Decomposition (BD; i.e., 2-stage problems). This scheme chooses points that are normally interior, feasible points in the master problem. Does not work with `warm_start=true`.
  * `regularize_param::Real` - A parameter between 0 and 1 that influences how far inside the feasible region the regularization can choose a solution.
  * `parallelize_benders::Bool` - For BD, whether to parallelize the solution of the second stage subgraphs if multiple subgraphs exist.
@@ -21,9 +22,12 @@ PlasmoBenders supports several different solver options. These are keyword argum
 !!! note
     If the objective value of a subproblem can be negative, it is important to set `M` to be less than zero. Otherwise, you can get lower bounds that are greater than upper bounds and the algorithm will not work. 
 
-The `run_algorithm!` solves a `BendersAlgorithm` object. There are two additional keyword arguments you can set with `run_algorithm!`
+The [`run_algorithm!`](@ref) solves a [`BendersAlgorithm`](@ref) object. There are two additional keyword arguments you can set with [`run_algorithm!`](@ref)
  * `output::Bool` - Whether to output the upper and lower bounds and the gap at each iteration of the algorithm
  * `run_gc::Bool` - Whether to run the garbage collector at the end of each iteration. Could potentially help with some memory issues. 
+ 
+## Two-Stage Problem Implementations
+Some solver options are only implemented for two-stage problems (what could be considered "traditional" Benders problems). These include `parallelize_benders`, `regularize`, and `feasibility_cuts`. Future development can include extending these to problems with three or more stages. 
     
 ## Reporting Issues
 If you encounter issues with PlasmoBenders, please open issues on Github's [issue tracker](https://github.com/plasmo-dev/PlasmoAlgorithms.jl/issues). 

@@ -13,7 +13,7 @@ pkg> add PlasmoBenders
 ```
 
 ## Citing PlasmoBenders.jl
-If you find PlasmoBenders.jl useful for your work, you may cite the [preprint](https://arxiv.org/pdf/2501.02098) as:
+If you find PlasmoBenders.jl useful for your work, you may cite the [preprint](https://arxiv.org/abs/2501.02098) as:
 ```
 @article{cole2025,
   title={Graph-Based Modeling and Decomposition of Hierarchical Optimization Problems},
