@@ -145,6 +145,7 @@ function _optimize_in_forward_pass!(optimizer, i, ub)
     else
         # Need to do feasibility cuts; the check termination status function already tested
         # that feasibility_cuts was true
+        println("Subgraph $i in forward pass was infeasible; using feasibility_cuts")
         _save_feasibility_cut_data(optimizer, next_object, ub)
     end
 
@@ -267,6 +268,7 @@ function _optimize_in_backward_pass(optimizer, i)
         if object_termination_status
             next_phi = JuMP.value(object, JuMP.objective_function(object))
         else
+            println("Subgraph $i in backwards pass was infeasible; using feasibility_cuts")
             next_phi = JuMP.dual_objective_value(object)
         end
 

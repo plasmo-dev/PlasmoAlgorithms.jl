@@ -175,6 +175,7 @@ mutable struct BendersAlgorithm{T} <: AbstractPBAlgorithm{T}
     slack_vars::Dict{T, Vector{NodeVariableRef}}
 
     objective_value::Float64
+    status::MOI.TerminationStatusCode
     lower_bounds::Vector{Float64}
     upper_bounds::Vector{Float64}
 
@@ -226,6 +227,7 @@ mutable struct BendersAlgorithm{T} <: AbstractPBAlgorithm{T}
         optimizer.slack_vars = Dict{T, Vector{NodeVariableRef}}()
 
         optimizer.objective_value = Inf
+        optimizer.status = MOI.OPTIMIZE_NOT_CALLED
         optimizer.lower_bounds = Vector{Float64}()
         optimizer.upper_bounds = Vector{Float64}()
 
@@ -315,6 +317,7 @@ function BendersAlgorithm(
     graph::Plasmo.OptiGraph,
     root_object::T;
     max_iters = 100,
+    max_time = Inf,
     tol::Float64 = 1e-7,
     M = 0.,
     is_MIP = nothing,
@@ -382,12 +385,13 @@ function BendersAlgorithm(
         end
         if !(get_multicut(optimizer)) && get_feasibility_cuts(optimizer)
             @warn("`multicut` cannot be false while `feasibility_cuts`` is true; setting `multicut` to true")
-            set_multi_cut!(optimizer, true)
+            set_multicut!(optimizer, true)
         end
 
         # Set initial data
         optimizer.root_object = root_object
         optimizer.max_iters = max_iters
+        optimizer.max_time = max_time
         optimizer.tol = tol
         optimizer.M = M
 
@@ -608,10 +612,12 @@ function run_algorithm!(
         if err < optimizer.tol
             optimizer.objective_value = optimizer.best_upper_bound
             println("Optimal Solution Found!")
+            optimizer.status = MOI.OPTIMAL
             return nothing
         end
 
         if sum(optimizer.time_iterations) > optimizer.max_time
+            optimizer.status = MOI.TIME_LIMIT
             break
         end
     end
@@ -628,6 +634,7 @@ function run_algorithm!(
     if sum(optimizer.time_iterations) > optimizer.max_time
         println("Maximum Time Limit of $(optimizer.max_time) s Exceeded")
     else
+        optimizer.status = MOI.ITERATION_LIMIT
         println("Maximum Number of Iterations Exceeded")
     end
     println("Optimality Gap at Termination was ", err)

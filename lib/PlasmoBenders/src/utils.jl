@@ -350,7 +350,7 @@ _algorithm_fields = [
     :root_object,
     :is_MIP,
     :max_iters,
-    :max_time,
+    :time_limit,
     :tol,
     :time_forward_pass,
     :time_backward_pass,
