@@ -71,46 +71,6 @@ function _add_Benders_cuts!(optimizer::BendersAlgorithm)
     end
 end
 
-function _solve_for_strengthened_cuts(optimizer, i)
-    next_object = optimizer.solve_order[i + 1]
-
-    comp_vars = optimizer.comp_vars[next_object]
-    var_copy_map = optimizer.var_copy_map[next_object]
-
-    # Loop through each complicating variable and set them
-    # Ensure that each complicating variable copy matches the original variable
-    for (j, var) in enumerate(comp_vars)
-        var_copy = var_copy_map[var]
-
-        if JuMP.is_binary(var)
-            JuMP.set_binary(var_copy)
-        elseif JuMP.is_integer(var)
-            JuMP.set_integer(var_copy)
-        end
-
-        if JuMP.has_lower_bound(var)
-            JuMP.set_lower_bound(var_copy, JuMP.lower_bound(var))
-        end
-        if JuMP.has_upper_bound(var)
-            JuMP.set_upper_bound(var_copy, JuMP.upper_bound(var))
-        end
-    end
-
-    _update_objective_and_optimize(optimizer, next_object)
-
-    # Unset binary/integer complicating variable copies
-    # These get fixed, so they do not need to be integer
-    for (j, var) in enumerate(comp_vars)
-        var_copy = var_copy_map[var]
-
-        if JuMP.is_binary(var)
-            JuMP.unset_binary(var_copy)
-        elseif JuMP.is_integer(var)
-            JuMP.unset_integer(var_copy)
-        end
-    end
-end
-
 function _update_objective_and_optimize(optimizer, next_object)
 
     comp_vars = optimizer.comp_vars[next_object]
@@ -178,8 +138,25 @@ function _optimize_in_forward_pass!(optimizer, i, ub)
     optimize!(next_object)
 
     # Check termination status
-    _check_termination_status(optimizer, next_object, i)
+    object_termination_status = _check_termination_status(optimizer, next_object, i)
 
+    if object_termination_status
+        _save_forward_pass_solutions(optimizer, next_object, ub)
+    else
+        # Need to do feasibility cuts; the check termination status function already tested
+        # that feasibility_cuts was true
+        println("Subgraph $i in forward pass was infeasible; using feasibility_cuts")
+        _save_feasibility_cut_data(optimizer, next_object, ub)
+    end
+
+    _check_fixed_slacks!(optimizer, next_object)
+
+    for (j, var) in enumerate(comp_vars)
+        JuMP.unfix(var_copy_map[var])
+    end
+end
+
+function _save_forward_pass_solutions(optimizer, next_object, ub)
     # Add to the upper bound; if it's not the last object, subtract the cost-to-go from upper bound
     obj_val = JuMP.value(next_object, JuMP.objective_function(next_object))
 
@@ -219,11 +196,30 @@ function _optimize_in_forward_pass!(optimizer, i, ub)
         next_object_vars = JuMP.all_variables(next_object)
         optimizer.last_solutions[next_object] = [JuMP.value(next_object, var) for var in next_object_vars]
     end
+end
 
-    _check_fixed_slacks!(optimizer, next_object)
+function _save_feasibility_cut_data(optimizer, next_object, ub)
+    # See JuMP documentation for implementation of this method:
+    # https://jump.dev/JuMP.jl/stable/tutorials/algorithms/benders_decomposition/#Feasibility-cuts
+    obj_val = JuMP.dual_objective_value(next_object)
 
-    for (j, var) in enumerate(comp_vars)
-        JuMP.unfix(var_copy_map[var])
+    next_objects = optimizer.solve_order_dict[next_object]
+    if length(next_objects) > 0
+        theta_val = _theta_value(optimizer, next_object)
+    else
+        theta_val = 0
+    end
+
+    # Save primal information to upcoming objects
+    ub[1] = Inf
+
+    if !optimizer.is_MIP
+        next_duals = _get_next_duals(optimizer, next_object)
+        dual_iters = optimizer.dual_iters[next_object]
+        optimizer.dual_iters[next_object] = hcat(dual_iters, next_duals)
+
+        next_phi = obj_val
+        push!(optimizer.phis[next_object], next_phi)
     end
 end
 
@@ -260,20 +256,25 @@ function _optimize_in_backward_pass(optimizer, i)
     optimize!(object)
 
     # Check termination status
-    _check_termination_status(optimizer, object, i)
+    object_termination_status = _check_termination_status(optimizer, object, i)
 
     # If it's not the first node, save the dual and phi values
     if i != 1
         dual_iters = optimizer.dual_iters[object]
         next_duals = _get_next_duals(optimizer, object)
 
-        next_phi = JuMP.value(object, JuMP.objective_function(object))
+        comp_vars = optimizer.comp_vars[object]
+        var_copy_map = optimizer.var_copy_map[object]
+
+        if object_termination_status
+            next_phi = JuMP.value(object, JuMP.objective_function(object))
+        else
+            println("Subgraph $i in backwards pass was infeasible; using feasibility_cuts")
+            next_phi = JuMP.dual_objective_value(object)
+        end
 
         optimizer.dual_iters[object] = hcat(dual_iters, next_duals)
         push!(optimizer.phis[object], next_phi)
-
-        comp_vars = optimizer.comp_vars[object]
-        var_copy_map = optimizer.var_copy_map[object]
 
         # Fix primal solutions
         for (j, var) in enumerate(comp_vars)
@@ -369,6 +370,46 @@ function _add_strengthened_cuts!(optimizer::BendersAlgorithm)
                     _add_cut_constraint!(optimizer, last_object, theta_expr, agg_rhs_expr_LR)
                 end
             end
+        end
+    end
+end
+
+function _solve_for_strengthened_cuts(optimizer, i)
+    next_object = optimizer.solve_order[i + 1]
+
+    comp_vars = optimizer.comp_vars[next_object]
+    var_copy_map = optimizer.var_copy_map[next_object]
+
+    # Loop through each complicating variable and set them
+    # Ensure that each complicating variable copy matches the original variable
+    for (j, var) in enumerate(comp_vars)
+        var_copy = var_copy_map[var]
+
+        if JuMP.is_binary(var)
+            JuMP.set_binary(var_copy)
+        elseif JuMP.is_integer(var)
+            JuMP.set_integer(var_copy)
+        end
+
+        if JuMP.has_lower_bound(var)
+            JuMP.set_lower_bound(var_copy, JuMP.lower_bound(var))
+        end
+        if JuMP.has_upper_bound(var)
+            JuMP.set_upper_bound(var_copy, JuMP.upper_bound(var))
+        end
+    end
+
+    _update_objective_and_optimize(optimizer, next_object)
+
+    # Unset binary/integer complicating variable copies
+    # These get fixed, so they do not need to be integer
+    for (j, var) in enumerate(comp_vars)
+        var_copy = var_copy_map[var]
+
+        if JuMP.is_binary(var)
+            JuMP.unset_binary(var_copy)
+        elseif JuMP.is_integer(var)
+            JuMP.unset_integer(var_copy)
         end
     end
 end

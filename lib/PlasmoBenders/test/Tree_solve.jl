@@ -1,4 +1,4 @@
-module TestDDP_Tree
+module Test_Tree
 
 using PlasmoBenders, Plasmo, JuMP, HiGHS, Test
 
@@ -78,4 +78,4 @@ end
 
 end
 
-TestDDP_Tree.run_tests()
+Test_Tree.run_tests()

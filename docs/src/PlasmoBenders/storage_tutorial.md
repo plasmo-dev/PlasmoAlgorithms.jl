@@ -87,7 +87,7 @@ The subgraphs have a (linear) tree structure, so we can pass this graph to Plasm
 solver = optimizer_with_attributes(HiGHS.Optimizer, "output_flag" => false)
 
 root_graph = local_subgraphs(graph)[1]
-BendersAlgorithm(graph, root_graph, solver = solver)
+benders_alg = BendersAlgorithm(graph, root_graph, solver = solver)
 ```
 
 The Nested Benders scheme is able to reach the optimal solution after 5 iterations. The bounds and gap are shown below.
@@ -100,21 +100,21 @@ Note that the first iteration returns an upper bound that is well above the opti
 
 PlasmoBenders provides access to API functions for querying the optimal solution from the BendersAlgorithm object. We can query the solution by calling 
 ```julia
-JuMP.objective_value(benders_opt)
+JuMP.objective_value(benders_alg)
 ```
 which returns the best upper bound. We can query the lower bound by calling
 ```julia
-JuMP.dual_objective_value(benders_opt)
+JuMP.dual_objective_value(benders_alg)
 ```
 This lower bound can be less than the upper bound for MIP problems since there can be a duality gap. We can also query the relative gap by calling
 ```julia
-relative_gap(benders_opt)
+relative_gap(benders_alg)
 ```
 Individual variable values can be retrieved by calling
 ```julia
-JuMP.value(benders_opt, graph[:nodes][1][:x_sell])
+JuMP.value(benders_alg, graph[:nodes][1][:x_sell])
 ```
 In addition, `JuMP.value` has been extended to also take a vector of variables rather than just a single variable, so we can also call
 ```julia
-JuMP.value(benders_opt, all_variables(graph))
+JuMP.value(benders_alg, all_variables(graph))
 ```

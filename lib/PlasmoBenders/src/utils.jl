@@ -260,6 +260,8 @@ function _check_termination_status(optimizer::BendersAlgorithm, object, count)
             else
                 error("Model on node/graph $count is infeasible; `add_slacks` is true, but there are not slacks to unfix!")
             end
+        elseif get_feasibility_cuts(optimizer) && count != 1
+            return false
         else
             error("Model on node/graph $count is infeasible")
         end
@@ -268,6 +270,7 @@ function _check_termination_status(optimizer::BendersAlgorithm, object, count)
     elseif (termination_status(object) != MOI.OPTIMAL) && (termination_status(object) != MOI.LOCALLY_SOLVED)
         error("Model on node/graph $count terminated with status $(termination_status(object))")
     end
+    return true
 end
 
 function JuMP.objective_value(optimizer::BendersAlgorithm, object, last_obj::Bool)
@@ -302,8 +305,8 @@ function _check_fixed_slacks!(optimizer::BendersAlgorithm, object)
     end
 end
 
-function _check_parallelize_Benders(optimizer::BendersAlgorithm)
-    if get_parallelize_benders(optimizer) || get_regularize(optimizer)
+function _check_two_stage_tree(optimizer::BendersAlgorithm)
+    if get_parallelize_benders(optimizer) || get_regularize(optimizer) || get_feasibility_cuts(optimizer)
         graph = optimizer.graph
         root_object = optimizer.root_object
         solve_order = optimizer.solve_order
@@ -326,6 +329,7 @@ end
 _options_bool_fields = [
     :strengthened,
     :multicut,
+    :feasibility_cuts,
     :regularize,
     :parallelize_benders,
     :parallelize_forward,
@@ -346,6 +350,7 @@ _algorithm_fields = [
     :root_object,
     :is_MIP,
     :max_iters,
+    :time_limit,
     :tol,
     :time_forward_pass,
     :time_backward_pass,

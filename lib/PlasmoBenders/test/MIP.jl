@@ -1,4 +1,4 @@
-module TestDDP_MIP
+module Test_MIP
 
 using PlasmoBenders, Plasmo, JuMP, HiGHS, Test
 
@@ -130,4 +130,4 @@ end
 
 end
 
-TestDDP_MIP.run_tests()
+Test_MIP.run_tests()
