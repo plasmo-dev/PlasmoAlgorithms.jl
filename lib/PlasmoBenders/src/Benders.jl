@@ -141,6 +141,7 @@ Benders subproblems to the data described)
  - `last_solutions` - dictionary mapping the nodes to a vector of the last solutions
  - `var_solution_map` - dictionary mapping the variables to their index on the `last_solutions` vector
  - `var_to_graph_map` - dictionary mapping the variables to their owning subproblem subgraph
+ - `feasibility_map` - dictionary matching `solve_order` for whether a problem was feasible or not
  - `options` - solver options for Benders algorithm
  - `ext` - Dictionary for extending certain procedures
 """
@@ -190,6 +191,7 @@ mutable struct BendersAlgorithm{T} <: AbstractPBAlgorithm{T}
     best_solutions::Dict{T, Vector{Float64}}
     best_upper_bound::Float64
 
+    feasibility_map::Dict{T, Bool}
     options::BendersOptions
 
     ext::Dict
@@ -242,6 +244,7 @@ mutable struct BendersAlgorithm{T} <: AbstractPBAlgorithm{T}
         optimizer.best_solutions = Dict{T, Vector{Float64}}()
         optimizer.best_upper_bound = Inf
 
+        optimizer.feasibility_map = Dict{T, Bool}()
         optimizer.options = BendersOptions()
 
         optimizer.ext = Dict{String, Any}()
@@ -370,7 +373,7 @@ function BendersAlgorithm(
         end
         if feasibility_cuts
             @warn(
-                "`feasibility_cuts` have been implemented but are still under development." *
+                "`feasibility_cuts` have been implemented but are still under development. " *
                 "If you experience bugs, please report them in the package's github issue tracker"
             )
         end
@@ -394,6 +397,7 @@ function BendersAlgorithm(
         optimizer.time_limit = time_limit
         optimizer.tol = tol
         optimizer.M = M
+        optimizer.feasibility_map[root_object] = true
 
         # Set is_MIP
         if isnothing(is_MIP)
@@ -401,10 +405,6 @@ function BendersAlgorithm(
         else
             optimizer.is_MIP = is_MIP
         end
-
-        #if feasibility_cuts && optimizer.is_MIP
-        #    error("Feasibility Cuts are not implemented for problems with integer variables in the second stage")
-        #end
 
         # Set solver if it is defined
         if !isnothing(solver)
@@ -431,7 +431,7 @@ function BendersAlgorithm(
             ############### Add complicating variables ##############
             # Get the linking constraints between last and current node
             _add_complicating_variables!(optimizer, parent_object, search_next, get_add_slacks(optimizer), get_slack_penalty(optimizer))
-            #Plasmo._init_graph_backend(optimizer.graph)
+            optimizer.feasibility_map[search_next] = true
 
             ################ Get the next object(s) in sequene ###################
             _add_next_object!(optimizer, parent_object, search_next, get_relaxed_init_cuts(optimizer))

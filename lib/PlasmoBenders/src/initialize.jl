@@ -24,6 +24,7 @@ function _init_ext!(optimizer::BendersAlgorithm{Plasmo.OptiGraph})
     optimizer.ext["node_to_graph"] = node_to_graph_map
     optimizer.ext["theta_vars"] = Dict{Plasmo.OptiGraph, Vector{NodeVariableRef}}()
     optimizer.ext["is_overlapped"] = false
+    optimizer.ext["incident_edges"] = Dict{Plasmo.OptiGraph, Vector{Plasmo.OptiEdge}}()
 
     return nothing
 end
@@ -43,7 +44,7 @@ function _add_second_object!(optimizer::BendersAlgorithm{Plasmo.OptiGraph}, rela
     start_nodes = all_nodes(root_object)
 
     # Get incident edges
-    edges = Plasmo.incident_edges(graph, root_object)
+    edges = Plasmo.incident_edges(optimizer, graph, root_object)
 
     # Loop through the nodes in the incident edges, and add their owning subgraphs to `graphs`
     graphs = []
@@ -121,11 +122,10 @@ function _add_complicating_variables!(
     next_object_vars = all_variables(next_object)
 
     # Get incident edges between last and next objects
-    last_object_optiedges = Plasmo.incident_edges(graph, last_object)
-    next_object_optiedges = Plasmo.incident_edges(graph, next_object)
+    last_object_optiedges = Plasmo.incident_edges(optimizer, graph, last_object)
+    next_object_optiedges = Plasmo.incident_edges(optimizer, graph, next_object)
 
-    complicating_edges = intersect(last_object_optiedges, next_object_optiedges)
-
+    complicating_edges = [e for e in next_object_optiedges if e in last_object_optiedges]
     comp_vars = NodeVariableRef[]
 
     # Map complicating variables to their owning node and vice versa
@@ -169,6 +169,7 @@ function _add_complicating_variables!(
             end
         end
     end
+
 
     # Get the set of all complicating variables on last object
     comp_var_map = Dict{NodeVariableRef, Int}()
@@ -327,9 +328,6 @@ function _add_complicating_variables!(
             end
         end
     end
-
-    # Reset graph backend
-    #Plasmo.set_graph_backend(optimizer.graph)
 end
 
 function _add_next_object!(
@@ -346,8 +344,8 @@ function _add_next_object!(
     node_to_graph = optimizer.ext["node_to_graph"]
 
     # Get the incident edges for next object nodes and last object nodes
-    last_object_incident_edges = incident_edges(optimizer.graph, last_object)
-    next_object_incident_edges = incident_edges(optimizer.graph, next_object)
+    last_object_incident_edges = incident_edges(optimizer, optimizer.graph, last_object)
+    next_object_incident_edges = incident_edges(optimizer, optimizer.graph, next_object)
 
     # Get the edges that are incident to next object but not connected to last object
     next_object_edge_diff = setdiff(next_object_incident_edges, last_object_incident_edges)
