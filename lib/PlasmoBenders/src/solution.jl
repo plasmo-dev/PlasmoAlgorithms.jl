@@ -18,6 +18,18 @@ function _add_cut_constraint!(
     #MOI.Utilities.reset_optimizer(last_object)
 end
 
+function _add_feasibility_cut_constraint!(
+    optimizer::BendersAlgorithm{Plasmo.OptiGraph},
+    last_object::Plasmo.OptiGraph,
+    rhs_expr::GenericAffExpr{Float64, Plasmo.NodeVariableRef}
+)
+    if length(rhs_expr.terms) > 1
+        @linkconstraint(last_object, 0 >= rhs_expr)
+    elseif length(rhs_expr.terms) == 1
+        @constraint(JuMP.owner_model(first(rhs_expr.terms)[1]), 0 >= rhs_expr)
+    end
+end
+
 """
     _add_Benders_cuts!(optimizer::BendersAlgorithm)
 
@@ -56,7 +68,11 @@ function _add_Benders_cuts!(optimizer::BendersAlgorithm)
 
                 if get_multicut(optimizer)
                     theta_var = _get_theta(optimizer, last_object, j)
-                    _add_cut_constraint!(optimizer, last_object, theta_var, rhs_expr)
+                    if optimizer.feasibility_list[i]
+                        _add_cut_constraint!(optimizer, last_object, theta_var, rhs_expr)
+                    else
+                        _add_feasibility_cut_constraint!(optimizer, last_object, rhs_expr)
+                    end
                 else
                     add_to_expression!(agg_rhs_expr, rhs_expr)
                 end
@@ -142,11 +158,13 @@ function _optimize_in_forward_pass!(optimizer, i, ub)
 
     if object_termination_status
         _save_forward_pass_solutions(optimizer, next_object, ub)
+        optimizer.feasibility_list[i] = true
     else
         # Need to do feasibility cuts; the check termination status function already tested
         # that feasibility_cuts was true
         println("Subgraph $i in forward pass was infeasible; using feasibility_cuts")
         _save_feasibility_cut_data(optimizer, next_object, ub)
+        optimizer.feasibility_list[i] = false
     end
 
     _check_fixed_slacks!(optimizer, next_object)
@@ -268,9 +286,11 @@ function _optimize_in_backward_pass(optimizer, i)
 
         if object_termination_status
             next_phi = JuMP.value(object, JuMP.objective_function(object))
+            optimizer.feasibility_list[i] = true
         else
             println("Subgraph $i in backwards pass was infeasible; using feasibility_cuts")
             next_phi = JuMP.dual_objective_value(object)
+            optimizer.feasibility_list[i] = false
         end
 
         optimizer.dual_iters[object] = hcat(dual_iters, next_duals)

@@ -1,6 +1,26 @@
-function Plasmo.incident_edges(graph::Plasmo.OptiGraph, subgraph::Plasmo.OptiGraph)
-    projection = hyper_projection(graph)
+function _get_hyper_projection(optimizer::BendersAlgorithm, graph::Plasmo.OptiGraph)
+    if haskey(optimizer.ext, "_projection")
+        return optimizer.ext["_projection"]
+    else
+        proj = Plasmo.hyper_projection(graph)
+        optimizer.ext["_projection"] = proj
+        return proj
+    end
+end
+
+function Plasmo.incident_edges(projection::T, subgraph::Plasmo.OptiGraph) where T <: Plasmo.GraphProjection
     return incident_edges(projection, all_nodes(subgraph))
+end
+
+function Plasmo.incident_edges(optimizer::BendersAlgorithm, graph::Plasmo.OptiGraph, subgraph::Plasmo.OptiGraph)
+    if haskey(optimizer.ext["incident_edges"], subgraph)
+        return optimizer.ext["incident_edges"][subgraph]
+    else
+        projection = _get_hyper_projection(optimizer, graph)
+        edges = Plasmo.incident_edges(projection, subgraph)
+        optimizer.ext["incident_edges"][subgraph] = edges
+        return edges
+    end
 end
 
 function _theta_value(optimizer::BendersAlgorithm, object::Plasmo.OptiGraph)
