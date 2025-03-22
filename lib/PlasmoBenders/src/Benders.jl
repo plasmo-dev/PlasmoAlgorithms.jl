@@ -141,7 +141,7 @@ Benders subproblems to the data described)
  - `last_solutions` - dictionary mapping the nodes to a vector of the last solutions
  - `var_solution_map` - dictionary mapping the variables to their index on the `last_solutions` vector
  - `var_to_graph_map` - dictionary mapping the variables to their owning subproblem subgraph
- - `feasibility_list` - vector matching `solve_order` for whether a problem was feasible or not
+ - `feasibility_map` - dictionary matching `solve_order` for whether a problem was feasible or not
  - `options` - solver options for Benders algorithm
  - `ext` - Dictionary for extending certain procedures
 """
@@ -191,7 +191,7 @@ mutable struct BendersAlgorithm{T} <: AbstractPBAlgorithm{T}
     best_solutions::Dict{T, Vector{Float64}}
     best_upper_bound::Float64
 
-    feasibility_list::Vector{Bool}
+    feasibility_map::Dict{T, Bool}
     options::BendersOptions
 
     ext::Dict
@@ -244,7 +244,7 @@ mutable struct BendersAlgorithm{T} <: AbstractPBAlgorithm{T}
         optimizer.best_solutions = Dict{T, Vector{Float64}}()
         optimizer.best_upper_bound = Inf
 
-        optimizer.feasibility_list = Vector{Bool}()
+        optimizer.feasibility_map = Dict{T, Bool}()
         optimizer.options = BendersOptions()
 
         optimizer.ext = Dict{String, Any}()
@@ -373,7 +373,7 @@ function BendersAlgorithm(
         end
         if feasibility_cuts
             @warn(
-                "`feasibility_cuts` have been implemented but are still under development." *
+                "`feasibility_cuts` have been implemented but are still under development. " *
                 "If you experience bugs, please report them in the package's github issue tracker"
             )
         end
@@ -397,6 +397,7 @@ function BendersAlgorithm(
         optimizer.time_limit = time_limit
         optimizer.tol = tol
         optimizer.M = M
+        optimizer.feasibility_map[root_object] = true
 
         # Set is_MIP
         if isnothing(is_MIP)
@@ -430,6 +431,7 @@ function BendersAlgorithm(
             ############### Add complicating variables ##############
             # Get the linking constraints between last and current node
             _add_complicating_variables!(optimizer, parent_object, search_next, get_add_slacks(optimizer), get_slack_penalty(optimizer))
+            optimizer.feasibility_map[search_next] = true
 
             ################ Get the next object(s) in sequene ###################
             _add_next_object!(optimizer, parent_object, search_next, get_relaxed_init_cuts(optimizer))
@@ -441,8 +443,6 @@ function BendersAlgorithm(
         if length(intersect(_get_objects(optimizer), optimizer.solve_order)) != length(_get_objects(optimizer))
             error("Number of nodes/graphs being solved does not match the number of nodes/graphs in the overall graph")
         end
-
-        optimizer.feasibility_list = fill(true, length(optimizer.solve_order))
 
         if get_add_slacks(optimizer) && get_fix_slacks(optimizer)
             slack_vars = optimizer.slack_vars

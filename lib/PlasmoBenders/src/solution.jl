@@ -68,7 +68,7 @@ function _add_Benders_cuts!(optimizer::BendersAlgorithm)
 
                 if get_multicut(optimizer)
                     theta_var = _get_theta(optimizer, last_object, j)
-                    if optimizer.feasibility_list[i]
+                    if optimizer.feasibility_map[object]
                         _add_cut_constraint!(optimizer, last_object, theta_var, rhs_expr)
                     else
                         _add_feasibility_cut_constraint!(optimizer, last_object, rhs_expr)
@@ -158,13 +158,13 @@ function _optimize_in_forward_pass!(optimizer, i, ub)
 
     if object_termination_status
         _save_forward_pass_solutions(optimizer, next_object, ub)
-        optimizer.feasibility_list[i] = true
+        optimizer.feasibility_map[next_object] = true
     else
         # Need to do feasibility cuts; the check termination status function already tested
         # that feasibility_cuts was true
         println("Subgraph $i in forward pass was infeasible; using feasibility_cuts")
         _save_feasibility_cut_data(optimizer, next_object, ub)
-        optimizer.feasibility_list[i] = false
+        optimizer.feasibility_map[next_object] = false
     end
 
     _check_fixed_slacks!(optimizer, next_object)
@@ -286,11 +286,11 @@ function _optimize_in_backward_pass(optimizer, i)
 
         if object_termination_status
             next_phi = JuMP.value(object, JuMP.objective_function(object))
-            optimizer.feasibility_list[i] = true
+            optimizer.feasibility_map[object] = true
         else
             println("Subgraph $i in backwards pass was infeasible; using feasibility_cuts")
             next_phi = JuMP.dual_objective_value(object)
-            optimizer.feasibility_list[i] = false
+            optimizer.feasibility_map[object] = false
         end
 
         optimizer.dual_iters[object] = hcat(dual_iters, next_duals)
