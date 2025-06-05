@@ -1,7 +1,7 @@
 """
     AbstractPBAlgorithm{T}
 """
-abstract type AbstractPBAlgorithm{T} end
+abstract type AbstractPBAlgorithm{T, V} end
 
 abstract type AbstractPBOptions end
 
@@ -86,13 +86,13 @@ mutable struct RegularizeData{T} <: PBData{T}
     lbs::Dict
     best_ub::Dict
 
-    function RegularizeData{OptiGraph}()
+    function RegularizeData{T}() where {T <: Plasmo.AbstractOptiGraph}
         rd = new()
 
-        rd.objective_function = Dict{OptiGraph, Any}()
-        rd.ubs = Dict{OptiGraph, Float64}()
-        rd.lbs = Dict{OptiGraph, Float64}()
-        rd.best_ub = Dict{OptiGraph, Float64}()
+        rd.objective_function = Dict{T, Any}()
+        rd.ubs = Dict{T, Float64}()
+        rd.lbs = Dict{T, Float64}()
+        rd.best_ub = Dict{T, Float64}()
 
         return rd
     end
@@ -145,8 +145,8 @@ Benders subproblems to the data described)
  - `options` - solver options for Benders algorithm
  - `ext` - Dictionary for extending certain procedures
 """
-mutable struct BendersAlgorithm{T} <: AbstractPBAlgorithm{T}
-    graph::Plasmo.OptiGraph
+mutable struct BendersAlgorithm{T, V} <: AbstractPBAlgorithm{T, V}
+    graph::T
     root_object::T
 
     is_MIP::Bool
@@ -170,10 +170,10 @@ mutable struct BendersAlgorithm{T} <: AbstractPBAlgorithm{T}
     time_init::Float64
     time_iterations::Vector{Float64}
 
-    comp_vars::Dict{T, Vector{NodeVariableRef}}
-    comp_var_map::Dict{T, Dict{NodeVariableRef, Int}}
-    var_copy_map::Dict{T, Dict{NodeVariableRef, NodeVariableRef}}
-    slack_vars::Dict{T, Vector{NodeVariableRef}}
+    comp_vars::Dict{T, Vector{V}}
+    comp_var_map::Dict{T, Dict{V, Int}}
+    var_copy_map::Dict{T, Dict{V, V}}
+    slack_vars::Dict{T, Vector{V}}
 
     objective_value::Float64
     status::MOI.TerminationStatusCode
@@ -182,12 +182,12 @@ mutable struct BendersAlgorithm{T} <: AbstractPBAlgorithm{T}
 
     regularize_data::RegularizeData{T}
 
-    binary_map::Dict{T, Dict{NodeVariableRef, Float64}}
-    integer_map::Dict{T, Dict{NodeVariableRef, Float64}}
+    binary_map::Dict{T, Dict{V, Float64}}
+    integer_map::Dict{T, Dict{V, Float64}}
 
     last_solutions::Dict{T, Vector{Float64}}
-    var_solution_map::Dict{T, Dict{NodeVariableRef, Int}}
-    var_to_graph_map::Dict{NodeVariableRef, T}
+    var_solution_map::Dict{T, Dict{V, Int}}
+    var_to_graph_map::Dict{V, T}
     best_solutions::Dict{T, Vector{Float64}}
     best_upper_bound::Float64
 
@@ -196,10 +196,19 @@ mutable struct BendersAlgorithm{T} <: AbstractPBAlgorithm{T}
 
     ext::Dict
 
-    function BendersAlgorithm{T}() where {T <: Plasmo.OptiGraph}
-        optimizer = new{T}()
-
-        optimizer.graph = Plasmo.OptiGraph()
+    function BendersAlgorithm{T, V}() where {T <: Plasmo.AbstractOptiGraph, V <: JuMP.AbstractVariableRef}
+        function build_graph(T)
+            if T == Plasmo.OptiGraph
+                return Plasmo.OptiGraph()
+            elseif T == Plasmo.RemoteOptiGraph
+                return Plasmo.RemoteOptiGraph()
+            else
+                error("$T must be a `Plasmo.OptiGraph` of `Plasmo.RemoteOptiGraph`")
+            end
+        end
+        optimizer = new{T, V}()
+        g = build_graph(T)
+        optimizer.graph = build_graph(T)
         optimizer.is_MIP = false
 
         optimizer.root_object = T()
@@ -223,10 +232,10 @@ mutable struct BendersAlgorithm{T} <: AbstractPBAlgorithm{T}
         optimizer.time_init = 0.
         optimizer.time_iterations = Vector{Float64}()
 
-        optimizer.comp_vars = Dict{T, Vector{NodeVariableRef}}()
-        optimizer.comp_var_map = Dict{T, Dict{NodeVariableRef, Int}}()
-        optimizer.var_copy_map = Dict{T, Dict{NodeVariableRef, NodeVariableRef}}()
-        optimizer.slack_vars = Dict{T, Vector{NodeVariableRef}}()
+        optimizer.comp_vars = Dict{T, Vector{V}}()
+        optimizer.comp_var_map = Dict{T, Dict{V, Int}}()
+        optimizer.var_copy_map = Dict{T, Dict{V, V}}()
+        optimizer.slack_vars = Dict{T, Vector{V}}()
 
         optimizer.objective_value = Inf
         optimizer.status = MOI.OPTIMIZE_NOT_CALLED
@@ -235,12 +244,12 @@ mutable struct BendersAlgorithm{T} <: AbstractPBAlgorithm{T}
 
         optimizer.regularize_data = RegularizeData{T}()
 
-        optimizer.binary_map = Dict{T, Dict{NodeVariableRef, Float64}}()
-        optimizer.integer_map = Dict{T, Dict{NodeVariableRef, Float64}}()
+        optimizer.binary_map = Dict{T, Dict{V, Float64}}()
+        optimizer.integer_map = Dict{T, Dict{V, Float64}}()
 
         optimizer.last_solutions = Dict{T, Vector{Float64}}()
-        optimizer.var_solution_map = Dict{T, Dict{NodeVariableRef, Int}}()
-        optimizer.var_to_graph_map = Dict{NodeVariableRef, Int}()
+        optimizer.var_solution_map = Dict{T, Dict{V, Int}}()
+        optimizer.var_to_graph_map = Dict{V, Int}()
         optimizer.best_solutions = Dict{T, Vector{Float64}}()
         optimizer.best_upper_bound = Inf
 
@@ -253,7 +262,7 @@ mutable struct BendersAlgorithm{T} <: AbstractPBAlgorithm{T}
     end
 end
 
-BendersAlgorithm() = BendersAlgorithm{Plasmo.OptiGraph}()
+BendersAlgorithm() = BendersAlgorithm{Plasmo.OptiGraph, NodeVariableRef}()
 
 """
     BendersAlgorithm(graph, root_object; kwargs...)
@@ -317,7 +326,7 @@ function BendersAlgorithm(
 end
 
 function BendersAlgorithm(
-    graph::Plasmo.OptiGraph,
+    graph::T,
     root_object::T;
     max_iters = 100,
     time_limit = Inf,
@@ -338,7 +347,7 @@ function BendersAlgorithm(
     relaxed_init_cuts::Bool = false,
     slack_penalty = 1e6,
     regularize_param::Real = 0.5
-) where {T <: Plasmo.OptiGraph}
+) where {T <: Plasmo.AbstractOptiGraph}
 
     if !(root_object in local_subgraphs(graph))
         error("root_object is not defined in the graph")
@@ -350,7 +359,8 @@ function BendersAlgorithm(
     time_init = @elapsed begin
 
         # Initiailize optimizer and graph
-        optimizer = BendersAlgorithm{T}()
+        V = Plasmo.variable_type(graph)
+        optimizer = BendersAlgorithm{T, V}()
         optimizer.graph = graph
 
         set_strengthened!(optimizer, strengthened)
@@ -461,11 +471,11 @@ function BendersAlgorithm(
         var_to_graph_map = optimizer.var_to_graph_map
         # Create mapping of binary and integer variables on each node
         for (i, object) in enumerate(optimizer.solve_order)
-            object_var_solution_map = Dict{NodeVariableRef, Int}()
+            object_var_solution_map = Dict{V, Int}()
             all_vars = all_variables(object)
 
-            bin_value_dict = Dict{NodeVariableRef, Float64}()
-            int_value_dict = Dict{NodeVariableRef, Float64}()
+            bin_value_dict = Dict{V, Float64}()
+            int_value_dict = Dict{V, Float64}()
             for (j, var) in enumerate(all_vars)
                 if JuMP.is_binary(var)
                     bin_value_dict[var] = 0
@@ -524,7 +534,7 @@ function run_algorithm!(
     println("Running BendersAlgorithm")
     println("################################################")
     println()
-    println("Number of Variables: $(length(all_variables(optimizer.graph)))")
+    println("Number of Variables: $(num_variables(optimizer.graph))")
     println("Number of Subproblems: $(length(optimizer.solve_order))")
     println()
 

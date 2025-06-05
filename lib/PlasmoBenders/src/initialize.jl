@@ -1,10 +1,11 @@
-function _init_ext!(optimizer::BendersAlgorithm{Plasmo.OptiGraph})
+function _init_ext!(optimizer::BendersAlgorithm{T, V}) where {T <: Plasmo.AbstractOptiGraph, V <: JuMP.AbstractVariableRef}
     graph = optimizer.graph
     subgraphs = local_subgraphs(graph)
 
+    N = Plasmo.node_type(graph)
     # Define mappings for variables and nodes to their subgraph
-    var_to_graph_map = Dict{NodeVariableRef, Plasmo.OptiGraph}()
-    node_to_graph_map = Dict{Plasmo.OptiNode, Plasmo.OptiGraph}()
+    var_to_graph_map = Dict{V, T}()
+    node_to_graph_map = Dict{N, T}()
 
     # Build mappings
     for (i, g) in enumerate(subgraphs)
@@ -19,17 +20,19 @@ function _init_ext!(optimizer::BendersAlgorithm{Plasmo.OptiGraph})
         end
     end
 
+    E = Plasmo.edge_type(graph)
+
     # Save mappings to the optimizer object
     optimizer.ext["var_to_graph"] = var_to_graph_map #TODO: Make a new structure
     optimizer.ext["node_to_graph"] = node_to_graph_map
-    optimizer.ext["theta_vars"] = Dict{Plasmo.OptiGraph, Vector{NodeVariableRef}}()
+    optimizer.ext["theta_vars"] = Dict{T, Vector{V}}()
     optimizer.ext["is_overlapped"] = false
-    optimizer.ext["incident_edges"] = Dict{Plasmo.OptiGraph, Vector{Plasmo.OptiEdge}}()
+    optimizer.ext["incident_edges"] = Dict{T, Vector{E}}()
 
     return nothing
 end
 
-function _add_second_object!(optimizer::BendersAlgorithm{Plasmo.OptiGraph}, relaxed)
+function _add_second_object!(optimizer::BendersAlgorithm{T, V}, relaxed) where {T <: Plasmo.AbstractOptiGraph, V <: JuMP.AbstractVariableRef}
     graph = optimizer.graph
     root_object = optimizer.root_object
     parent_objects = optimizer.parent_objects
@@ -38,7 +41,7 @@ function _add_second_object!(optimizer::BendersAlgorithm{Plasmo.OptiGraph}, rela
     var_to_graph_map = optimizer.ext["var_to_graph"]
     node_to_graph_map = optimizer.ext["node_to_graph"]
 
-    optimizer.ext["search_next"] = Vector{typeof(root_object)}()
+    optimizer.ext["search_next"] = Vector{T}()
 
     # Get all nodes in the start object
     start_nodes = all_nodes(root_object)
@@ -51,6 +54,19 @@ function _add_second_object!(optimizer::BendersAlgorithm{Plasmo.OptiGraph}, rela
     for (i, edge) in enumerate(edges)
         nodes = edge.nodes
         for (j, node) in enumerate(nodes)
+            keyvec = collect(keys(node_to_graph_map))
+            for n in keyvec
+                if n.node_idx == node.node_idx
+                    println("labels = ", n.node_label, "  ", node.node_label)
+                    println(n.node_label == node.node_label)
+                    println("idx = ", n.node_idx, "  ", node.node_idx)
+                    println(n.node_idx == node.node_idx)
+                    println("graph labels = ", n.remote_graph.label, "   ", node.remote_graph.label)
+                    println(n.remote_graph == node.remote_graph)
+                    println(n == node)
+                end
+            end
+            
             node_graph = node_to_graph_map[node]
             if node_graph != root_object
                 if !(node_graph in graphs)
@@ -79,10 +95,10 @@ function _add_second_object!(optimizer::BendersAlgorithm{Plasmo.OptiGraph}, rela
 end
 
 function _add_cost_to_go!(
-    optimizer::BendersAlgorithm{Plasmo.OptiGraph},
-    last_object::Plasmo.OptiGraph,
+    optimizer::BendersAlgorithm{T, V},
+    last_object::T,
     relaxed::Bool
-)
+) where {T <: Plasmo.AbstractOptiGraph, V <: JuMP.AbstractVariableRef}
     num_thetas = length(optimizer.solve_order_dict[last_object])
 
     # Define a new node on the subgraph and add theta to that node
@@ -108,12 +124,12 @@ function _add_cost_to_go!(
 end
 
 function _add_complicating_variables!(
-    optimizer::BendersAlgorithm{Plasmo.OptiGraph},
-    last_object::Plasmo.OptiGraph,
-    next_object::Plasmo.OptiGraph,
+    optimizer::BendersAlgorithm{T, V},
+    last_object::T,
+    next_object::T,
     add_slacks::Bool,
     slack_penalty::Real
-)
+) where {T <: Plasmo.AbstractOptiGraph, V <: JuMP.AbstractVariableRef}
     graph = optimizer.graph
     last_nodes = all_nodes(last_object)
     next_nodes = all_nodes(next_object)
@@ -126,11 +142,13 @@ function _add_complicating_variables!(
     next_object_optiedges = Plasmo.incident_edges(optimizer, graph, next_object)
 
     complicating_edges = [e for e in next_object_optiedges if e in last_object_optiedges]
-    comp_vars = NodeVariableRef[]
+    comp_vars = Vector{V}()
+
+    N = Plasmo.node_type(graph)
 
     # Map complicating variables to their owning node and vice versa
-    node_to_var = Dict{Plasmo.OptiNode, Vector{NodeVariableRef}}()
-    var_to_node = Dict{NodeVariableRef, Plasmo.OptiNode}()
+    node_to_var = Dict{N, Vector{V}}()
+    var_to_node = Dict{V, N}()
 
     # Loop through each edge
     for (i, edge) in enumerate(complicating_edges)
@@ -172,7 +190,7 @@ function _add_complicating_variables!(
 
 
     # Get the set of all complicating variables on last object
-    comp_var_map = Dict{NodeVariableRef, Int}()
+    comp_var_map = Dict{V, Int}()
 
     # Map complicating variables to their index
     for (i, var) in enumerate(comp_vars)
@@ -198,7 +216,7 @@ function _add_complicating_variables!(
     ############## Add constraints for complicating variables #####################
 
     # Define map from variable copies to their original variables
-    var_copy_map = Dict{NodeVariableRef, NodeVariableRef}()
+    var_copy_map = Dict{V, V}()
 
     # Loop through the nodes and add a variable copy on each node
     for node in keys(node_to_var)
@@ -226,10 +244,10 @@ function _add_complicating_variables!(
     # link = linking constriants (requires linking)
     # Linking constraints are required for constraints in the subgraph that have
     # complicating variables on more than one node
-    con_to_node = Dict{ConstraintRef, Plasmo.OptiNode}()
-    node_to_con = Dict{Plasmo.OptiNode, Vector{ConstraintRef}}()
-    linking_to_node = Dict{ConstraintRef, Plasmo.OptiNode}()
-    node_to_linking = Dict{Plasmo.OptiNode, Vector{ConstraintRef}}()
+    con_to_node = Dict{ConstraintRef, N}()
+    node_to_con = Dict{N, Vector{ConstraintRef}}()
+    linking_to_node = Dict{ConstraintRef, N}()
+    node_to_linking = Dict{N, Vector{ConstraintRef}}()
 
     # Loop through the complicating edges; decide if a constraint on the edge
     # requires a normal or a linking constraint
@@ -331,11 +349,11 @@ function _add_complicating_variables!(
 end
 
 function _add_next_object!(
-    optimizer::BendersAlgorithm{Plasmo.OptiGraph},
-    last_object::Plasmo.OptiGraph,
-    next_object::Plasmo.OptiGraph,
+    optimizer::BendersAlgorithm{T, V},
+    last_object::T,
+    next_object::T,
     relaxed::Bool
-)
+) where {T <: Plasmo.AbstractOptiGraph, V <: JuMP.AbstractVariableRef}
     # Get the nodes from the last and next objects
     next_object_nodes = all_nodes(next_object)
     last_object_nodes = all_nodes(last_object)
@@ -350,7 +368,7 @@ function _add_next_object!(
     # Get the edges that are incident to next object but not connected to last object
     next_object_edge_diff = setdiff(next_object_incident_edges, last_object_incident_edges)
 
-    next_graphs = Plasmo.OptiGraph[]
+    next_graphs = Vector{T}()
 
     # Loop through the edges and get the subgraphs they map to
     for (i, edge) in enumerate(next_object_edge_diff)

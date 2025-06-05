@@ -12,32 +12,41 @@ function Plasmo.incident_edges(projection::T, subgraph::Plasmo.OptiGraph) where 
     return incident_edges(projection, all_nodes(subgraph))
 end
 
-function Plasmo.incident_edges(optimizer::BendersAlgorithm, graph::Plasmo.OptiGraph, subgraph::Plasmo.OptiGraph)
+function _get_incident_edges(optimizer::BendersAlgorithm, graph::Plasmo.OptiGraph, subgraph::Plasmo.OptiGraph)
+    projection = _get_hyper_projection(optimizer, graph)
+    edges = Plasmo.incident_edges(projection, subgraph)
+    optimizer.ext["incident_edges"][subgraph] = edges
+    return edges
+end
+
+function _get_incident_edges(optimizer::BendersAlgorithm, graph::Plasmo.RemoteOptiGraph, subgraph::Plasmo.RemoteOptiGraph)
+    edges = Plasmo.incident_edges(subgraph)
+    return edges
+end
+
+function Plasmo.incident_edges(optimizer::BendersAlgorithm, graph::T, subgraph::T) where {T <: Plasmo.AbstractOptiGraph}
     if haskey(optimizer.ext["incident_edges"], subgraph)
         return optimizer.ext["incident_edges"][subgraph]
     else
-        projection = _get_hyper_projection(optimizer, graph)
-        edges = Plasmo.incident_edges(projection, subgraph)
-        optimizer.ext["incident_edges"][subgraph] = edges
-        return edges
+        return _get_incident_edges(optimizer, graph, subgraph)
     end
 end
 
-function _theta_value(optimizer::BendersAlgorithm, object::Plasmo.OptiGraph)
+function _theta_value(optimizer::BendersAlgorithm, object::T) where {T <: Plasmo.AbstractOptiGraph}
     theta_var = optimizer.ext["theta_vars"][object]
     return sum(JuMP.value(object, theta) for theta in theta_var)
 end
 
-function _get_theta(optimizer::BendersAlgorithm, object::Plasmo.OptiGraph)
+function _get_theta(optimizer::BendersAlgorithm, object::T) where {T <: Plasmo.AbstractOptiGraph}
     return optimizer.ext["theta_vars"][object]
 end
 
-function _get_theta(optimizer::BendersAlgorithm, object::Plasmo.OptiGraph, idx::Int)
+function _get_theta(optimizer::BendersAlgorithm, object::T, idx::Int) where {T <: Plasmo.AbstractOptiGraph}
     return optimizer.ext["theta_vars"][object][idx]
 end
 
 # Define a function for getting the dual value of the linking constraints
-function _get_next_duals(optimizer::BendersAlgorithm, next_object::Plasmo.OptiGraph)
+function _get_next_duals(optimizer::BendersAlgorithm, next_object::T) where {T <: Plasmo.AbstractOptiGraph}
     var_copy_map = optimizer.var_copy_map[next_object]
     comp_vars = optimizer.comp_vars[next_object]
 
@@ -48,10 +57,10 @@ end
 # TODO: Need to improve the interface for getting values
 # Define function for getting the best solution from the optimizer
 function JuMP.value(
-    optimizer::BendersAlgorithm{Plasmo.OptiGraph},
+    optimizer::BendersAlgorithm{T},
     var::NodeVariableRef,
-    object::Plasmo.OptiGraph
-)
+    object::T
+) where {T <: Plasmo.AbstractOptiGraph}
     var_solution_map = optimizer.var_solution_map[object]
     # Get the variable index for the variable on the node
     var_index = var_solution_map[var]
@@ -65,12 +74,12 @@ function JuMP.value(
 end
 
 """
-    JuMP.value(opt::BendersAlgorithm, var::NodeVariableRef)
+    JuMP.value(opt::BendersAlgorithm, var::VariableRef)
     
 Returns the value of `var` from the BendersAlgorithm object. The value corresponds to the
 best upper bound of the optimizer.
 """
-function JuMP.value(optimizer::BendersAlgorithm, var::NodeVariableRef)
+function JuMP.value(optimizer::BendersAlgorithm, var::V) where {V <: JuMP.AbstractVariableRef}
     best_solutions = optimizer.best_solutions
     var_solution_map = optimizer.var_solution_map
     var_to_graph_map = optimizer.var_to_graph_map
@@ -88,12 +97,12 @@ function JuMP.value(optimizer::BendersAlgorithm, var::NodeVariableRef)
 end
 
 """
-    JuMP.value(opt::BendersAlgorithm, vars::Vector{NodeVariableRef})
+    JuMP.value(opt::BendersAlgorithm, vars::Vector{VariableRef})
     
 Returns a vector of variables contained in the `vars` vector from the BendersAlgorithm
 object. The values correspond to the best upper bound of the optimizer.
 """
-function JuMP.value(optimizer::BendersAlgorithm, vars::Vector{NodeVariableRef})
+function JuMP.value(optimizer::BendersAlgorithm, vars::Vector{V}) where {V <: JuMP.AbstractVariableRef}
     best_solutions = optimizer.best_solutions
     var_solution_map = optimizer.var_solution_map
     var_to_graph_map = optimizer.var_to_graph_map
@@ -154,7 +163,7 @@ function _warm_start(optimizer::BendersAlgorithm, object)
 end
 
 # Define functions for adding slacks, and adding them to the objectives
-function _add_slack_to_node(optimizer::BendersAlgorithm, next_object, node::Plasmo.OptiNode, num_links, slack_penalty)
+function _add_slack_to_node(optimizer::BendersAlgorithm, next_object, node::N, num_links, slack_penalty) where {N <: Union{Plasmo.OptiNode, Plasmo.RemoteNodeRef}}
     # Define slack variables
     @variable(node, _slack_up[1:num_links] >= 0)
     @variable(node, _slack_down[1:num_links] >= 0)
@@ -177,9 +186,9 @@ function _add_slack_to_node(optimizer::BendersAlgorithm, next_object, node::Plas
 
     # Ensure the objective is an Affine Expression
     if typeof(obj_func) == NodeVariableRef
-        obj_func = GenericAffExpr{Float64, Plasmo.NodeVariableRef}(0, obj_func => 1)
+        obj_func = GenericAffExpr{Float64, N}(0, obj_func => 1)
     elseif typeof(obj_func) == nothing
-        obj_func = GenericAffExpr{Float64, Plasmo.NodeVariableRef}()
+        obj_func = GenericAffExpr{Float64, N}()
     end
 
     # Add the slacks to the objective function
@@ -193,7 +202,7 @@ function _add_slack_to_node(optimizer::BendersAlgorithm, next_object, node::Plas
     @objective(node, Min, obj_func)
 end
 
-function _add_slack_to_node_for_links(optimizer::BendersAlgorithm, next_object::Plasmo.OptiGraph, node::Plasmo.OptiNode, num_links, slack_penalty)
+function _add_slack_to_node_for_links(optimizer::BendersAlgorithm, next_object::T, node::N, num_links, slack_penalty) where {T <: Plasmo.AbstractOptiGraph, N <: Union{Plasmo.OptiNode, Plasmo.RemoteNodeRef}}
     # Define slack variables
     @variable(node, _slack_up_link[1:num_links] >= 0)
     @variable(node, _slack_down_link[1:num_links] >= 0)
@@ -249,11 +258,11 @@ function _set_is_MIP(optimizer::BendersAlgorithm)
     return nothing
 end
 
-function _get_objects(optimizer::BendersAlgorithm{Plasmo.OptiGraph})
+function _get_objects(optimizer::BendersAlgorithm{T}) where {T <: Plasmo.AbstractOptiGraph}
     return local_subgraphs(optimizer.graph)
 end
 
-function _get_objects(graph::Plasmo.OptiGraph)
+function _get_objects(graph::T) where {T <: Plasmo.AbstractOptiGraph}
     return local_subgraphs(graph)
 end
 
