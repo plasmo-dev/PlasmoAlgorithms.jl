@@ -1,9 +1,9 @@
 function _add_cut_constraint!(
-    optimizer::BendersAlgorithm{Plasmo.OptiGraph},
-    last_object::Plasmo.OptiGraph,
-    theta_expr::V,
-    rhs_expr::GenericAffExpr{Float64, Plasmo.NodeVariableRef}
-) where V <: Union{GenericAffExpr{Float64, Plasmo.NodeVariableRef}, NodeVariableRef}
+    optimizer::BendersAlgorithm{T},
+    last_object::T,
+    theta_expr::V1,
+    rhs_expr::GenericAffExpr{Float64, V2}
+) where {T <: Plasmo.AbstractOptiGraph, V1 <: Union{GenericAffExpr, JuMP.AbstractVariableRef}, V2 <: JuMP.AbstractVariableRef}
 
     if length(rhs_expr.terms) != 0
         #if length(unique(JuMP.owner_model.(keys(rhs_expr.terms)))) =< 1 #TODO: FIx this!
@@ -19,10 +19,10 @@ function _add_cut_constraint!(
 end
 
 function _add_feasibility_cut_constraint!(
-    optimizer::BendersAlgorithm{Plasmo.OptiGraph},
-    last_object::Plasmo.OptiGraph,
-    rhs_expr::GenericAffExpr{Float64, Plasmo.NodeVariableRef}
-)
+    optimizer::BendersAlgorithm{T},
+    last_object::T,
+    rhs_expr::GenericAffExpr{Float64, V}
+) where {T <: Plasmo.AbstractOptiGraph, V <: JuMP.AbstractVariableRef}
     if length(rhs_expr.terms) > 1
         @linkconstraint(last_object, 0 >= rhs_expr)
     elseif length(rhs_expr.terms) == 1
@@ -37,16 +37,17 @@ Add Benders cuts to each nested problem; uses results from the backward pass and
 pass to create cuts.
 """
 function _add_Benders_cuts!(optimizer::BendersAlgorithm)
+    V = Plasmo.variable_type(optimizer.graph)
     # Loop through each object; compile information and add Benders cut
     for i in 1:(length(optimizer.solve_order))
         last_object = optimizer.solve_order[i]
         next_objects = optimizer.solve_order_dict[last_object]
 
         if length(next_objects) > 0
-            agg_rhs_expr = GenericAffExpr{Float64, Plasmo.NodeVariableRef}()
+            agg_rhs_expr = GenericAffExpr{Float64, V}()
 
             for (j, object) in enumerate(next_objects)
-                rhs_expr = GenericAffExpr{Float64, Plasmo.NodeVariableRef}()
+                rhs_expr = GenericAffExpr{Float64, V}()
                 # Complicating variables are on previous object
                 comp_vars = optimizer.comp_vars[object]
 
@@ -88,7 +89,7 @@ function _add_Benders_cuts!(optimizer::BendersAlgorithm)
 end
 
 function _update_objective_and_optimize(optimizer, next_object)
-
+    V = Plasmo.variable_type(optimizer.graph)
     comp_vars = optimizer.comp_vars[next_object]
     var_copy_map = optimizer.var_copy_map[next_object]
 
@@ -102,7 +103,7 @@ function _update_objective_and_optimize(optimizer, next_object)
     next_object_objective_function = JuMP.objective_function(next_object)
 
     # Ensure the objective function is an Expr, not a single variable
-    if typeof(next_object_objective_function) == NodeVariableRef
+    if typeof(next_object_objective_function) == V
         next_object_objective_function = AffExpr(0, next_object_objective_function => 1)
     end
 
@@ -137,7 +138,7 @@ function _update_objective_and_optimize(optimizer, next_object)
 
 end
 
-function _optimize_in_forward_pass!(optimizer, i, ub)
+function _optimize_in_forward_pass!(optimizer, i, ub) #TODO: Type this function
     next_object = optimizer.solve_order[i]
 
     comp_vars = optimizer.comp_vars[next_object]
@@ -327,18 +328,18 @@ function _add_strengthened_cuts!(optimizer::BendersAlgorithm)
     #for i in 1:(length(optimizer.solve_order) - 1)
         _solve_for_strengthened_cuts(optimizer, i)
     end
-
+    V = Plasmo.variable_type(optimizer.graph)
     for i in 1:(length(optimizer.solve_order))
         last_object = optimizer.solve_order[i]
         next_objects = optimizer.solve_order_dict[last_object]
 
         if length(next_objects) > 0
-            agg_rhs_expr = GenericAffExpr{Float64, Plasmo.NodeVariableRef}()
-            agg_rhs_expr_LR = GenericAffExpr{Float64, Plasmo.NodeVariableRef}()
+            agg_rhs_expr = GenericAffExpr{Float64, V}()
+            agg_rhs_expr_LR = GenericAffExpr{Float64, V}()
 
             for (j, object) in enumerate(next_objects)
-                rhs_expr = GenericAffExpr{Float64, Plasmo.NodeVariableRef}()
-                rhs_expr_LR = GenericAffExpr{Float64, Plasmo.NodeVariableRef}()
+                rhs_expr = GenericAffExpr{Float64, V}()
+                rhs_expr_LR = GenericAffExpr{Float64, V}()
 
                 # Complicating variables are on previous object
                 comp_vars = optimizer.comp_vars[object]
@@ -539,7 +540,11 @@ function _add_initial_relaxed_cuts!(
     optimizer.ext["link_var_mapping"] = link_vars_mapping
 end
 
-function _add_to_upper_bound!(optimizer::BendersAlgorithm, object::OptiGraph, ub)
+function _add_to_upper_bound!(
+    optimizer::BendersAlgorithm{T}, 
+    object::T, 
+    ub
+) where {T <: Plasmo.AbstractOptiGraph}
     obj_val = JuMP.value(object, JuMP.objective_function(object))
     ub[1] += obj_val
     if length(optimizer.solve_order_dict[object]) > 0

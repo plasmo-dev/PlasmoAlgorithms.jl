@@ -54,18 +54,18 @@ function _add_second_object!(optimizer::BendersAlgorithm{T, V}, relaxed) where {
     for (i, edge) in enumerate(edges)
         nodes = edge.nodes
         for (j, node) in enumerate(nodes)
-            keyvec = collect(keys(node_to_graph_map))
-            for n in keyvec
-                if n.node_idx == node.node_idx
-                    println("labels = ", n.node_label, "  ", node.node_label)
-                    println(n.node_label == node.node_label)
-                    println("idx = ", n.node_idx, "  ", node.node_idx)
-                    println(n.node_idx == node.node_idx)
-                    println("graph labels = ", n.remote_graph.label, "   ", node.remote_graph.label)
-                    println(n.remote_graph == node.remote_graph)
-                    println(n == node)
-                end
-            end
+            # keyvec = collect(keys(node_to_graph_map))
+            # for n in keyvec
+            #     if n.node_idx == node.node_idx
+            #         println("labels = ", n.node_label, "  ", node.node_label)
+            #         println(n.node_label == node.node_label)
+            #         println("idx = ", n.node_idx, "  ", node.node_idx)
+            #         println(n.node_idx == node.node_idx)
+            #         println("graph labels = ", n.remote_graph.label, "   ", node.remote_graph.label)
+            #         println(n.remote_graph == node.remote_graph)
+            #         println(n == node)
+            #     end
+            # end
             
             node_graph = node_to_graph_map[node]
             if node_graph != root_object
@@ -112,6 +112,9 @@ function _add_cost_to_go!(
     # If the initial relaxation is not being solved, set lower bound as M
     if !relaxed || !(optimizer.is_MIP)
         for i in 1:num_thetas
+            # println(last_object[:_theta_node])
+            # rg = last_object[:_theta_node]
+            # println(last_object[:_theta_node][:_theta])
             JuMP.set_lower_bound(last_object[:_theta_node][:_theta][i], optimizer.M)
         end
     end
@@ -155,7 +158,7 @@ function _add_complicating_variables!(
         # Loop through each linkref on each edge
         for (j, link) in enumerate(all_constraints(edge))
 
-            con_obj = constraint_object(link)
+            con_obj = JuMP.constraint_object(link)
             vars = con_obj.func.terms.keys
 
             next_object_link_vars = [var for var in vars if source_graph(JuMP.owner_model(var)) == next_object]
@@ -253,7 +256,7 @@ function _add_complicating_variables!(
     # requires a normal or a linking constraint
     for (i, edge) in enumerate(complicating_edges)
         for (j, link) in enumerate(all_constraints(edge))
-            con_obj = constraint_object(link)
+            con_obj = JuMP.constraint_object(link)
             vars = con_obj.func.terms.keys
 
             # Get the variables from the constraint in the next_object
@@ -302,7 +305,7 @@ function _add_complicating_variables!(
             _add_slack_to_node(optimizer, next_object, node, length(cons), slack_penalty)
 
             for (j, con) in enumerate(cons)
-                con_obj = constraint_object(con)
+                con_obj = JuMP.constraint_object(con)
                 _add_constraint_to_subproblem!(con_obj, comp_vars, var_copy_map,
                                               next_object, node, false; slack = true,
                                               slack_up = node[:_slack_up][j],
@@ -316,7 +319,7 @@ function _add_complicating_variables!(
             _add_slack_to_node_for_links(optimizer, next_object, node, length(links), slack_penalty)
 
             for (j, link) in enumerate(links)
-                con_obj = constraint_object(link)
+                con_obj = JuMP.constraint_object(link)
                 _add_constraint_to_subproblem!(con_obj, comp_vars, var_copy_map,
                                               next_object, node, true; slack = true,
                                               slack_up = node[:_slack_up_link][j],
@@ -329,7 +332,7 @@ function _add_complicating_variables!(
         for node in keys(node_to_con)
             cons = node_to_con[node]
             for (j, con) in enumerate(cons)
-                con_obj = constraint_object(con)
+                con_obj = JuMP.constraint_object(con)
                 _add_constraint_to_subproblem!(con_obj, comp_vars, var_copy_map,
                                                next_object, node, false
                 )
@@ -339,7 +342,7 @@ function _add_complicating_variables!(
         for node in keys(node_to_linking)
             links = node_to_linking[node]
             for (j, link) in enumerate(links)
-                con_obj = constraint_object(link)
+                con_obj = JuMP.constraint_object(link)
                 _add_constraint_to_subproblem!(con_obj, comp_vars, var_copy_map,
                                                next_object, node, true
                 )

@@ -58,9 +58,9 @@ end
 # Define function for getting the best solution from the optimizer
 function JuMP.value(
     optimizer::BendersAlgorithm{T},
-    var::NodeVariableRef,
+    var::V,
     object::T
-) where {T <: Plasmo.AbstractOptiGraph}
+) where {T <: Plasmo.AbstractOptiGraph, V <: JuMP.AbstractVariableRef}
     var_solution_map = optimizer.var_solution_map[object]
     # Get the variable index for the variable on the node
     var_index = var_solution_map[var]
@@ -167,11 +167,11 @@ function _add_slack_to_node(optimizer::BendersAlgorithm, next_object, node::N, n
     # Define slack variables
     @variable(node, _slack_up[1:num_links] >= 0)
     @variable(node, _slack_down[1:num_links] >= 0)
-
+    V = Plasmo.variable_type(optimizer.graph)
     slack_vars_dict = optimizer.slack_vars
 
     if !(haskey(slack_vars_dict, next_object))
-        slack_vars_dict[next_object] = NodeVariableRef[]
+        slack_vars_dict[next_object] = V[]
     end
 
     for var in _slack_up
@@ -185,7 +185,7 @@ function _add_slack_to_node(optimizer::BendersAlgorithm, next_object, node::N, n
     obj_func = objective_function(node)
 
     # Ensure the objective is an Affine Expression
-    if typeof(obj_func) == NodeVariableRef
+    if isa(obj_func, V)
         obj_func = GenericAffExpr{Float64, N}(0, obj_func => 1)
     elseif typeof(obj_func) == nothing
         obj_func = GenericAffExpr{Float64, N}()
@@ -203,6 +203,7 @@ function _add_slack_to_node(optimizer::BendersAlgorithm, next_object, node::N, n
 end
 
 function _add_slack_to_node_for_links(optimizer::BendersAlgorithm, next_object::T, node::N, num_links, slack_penalty) where {T <: Plasmo.AbstractOptiGraph, N <: Union{Plasmo.OptiNode, Plasmo.RemoteNodeRef}}
+    V = Plasmo.variable_type(optimizer.graph)
     # Define slack variables
     @variable(node, _slack_up_link[1:num_links] >= 0)
     @variable(node, _slack_down_link[1:num_links] >= 0)
@@ -210,7 +211,7 @@ function _add_slack_to_node_for_links(optimizer::BendersAlgorithm, next_object::
     slack_vars_dict = optimizer.slack_vars
 
     if !(haskey(slack_vars_dict, next_object))
-        slack_vars_dict[next_object] = NodeVariableRef[]
+        slack_vars_dict[next_object] = V[]
     end
 
     for var in _slack_up_link
@@ -224,10 +225,10 @@ function _add_slack_to_node_for_links(optimizer::BendersAlgorithm, next_object::
     obj_func = objective_function(node)
 
     # Ensure the objective is an Affine Expression
-    if typeof(obj_func) == NodeVariableRef
-        obj_func = GenericAffExpr{Float64, Plasmo.NodeVariableRef}(0, obj_func => 1)
-    elseif typeof(obj_func) == nothing
-        obj_func = GenericAffExpr{Float64, Plasmo.NodeVariableRef}()
+    if isa(obj_func, V)
+        obj_func = GenericAffExpr{Float64, V}(0, obj_func => 1)
+    elseif isnothing(obj_func)
+        obj_func = GenericAffExpr{Float64, V}()
     end
 
     # Add the slacks to the objective function
