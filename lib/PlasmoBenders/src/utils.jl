@@ -50,7 +50,8 @@ function _get_next_duals(optimizer::BendersAlgorithm, next_object::T) where {T <
     var_copy_map = optimizer.var_copy_map[next_object]
     comp_vars = optimizer.comp_vars[next_object]
 
-    dual_vector = Float64[JuMP.dual(next_object, FixRef(var_copy_map[comp_vars[i]])) for i in 1:length(comp_vars)]
+    copy_vars = [var_copy_map[comp_vars[i]] for i in 1:length(comp_vars)]
+    dual_vector = _get_dual_vector(next_object, copy_vars)
     return dual_vector
 end
 
@@ -244,7 +245,7 @@ function _add_slack_to_node_for_links(optimizer::BendersAlgorithm, next_object::
 end
 
 # Test if the problem is a MIP
-function _set_is_MIP(optimizer::BendersAlgorithm)
+function _set_is_MIP(optimizer::BendersAlgorithm{Plasmo.OptiGraph})
     graph = optimizer.graph
 
     graph_vars = setdiff(JuMP.all_variables(graph), JuMP.all_variables(optimizer.root_object))
@@ -257,6 +258,31 @@ function _set_is_MIP(optimizer::BendersAlgorithm)
     end
     optimizer.is_MIP = false
     return nothing
+end
+
+# Test if the problem is a MIP
+function _set_is_MIP(optimizer::BendersAlgorithm{Plasmo.RemoteOptiGraph})
+    graph = optimizer.graph
+
+    subgraphs = graph.subgraphs
+    for g in subgraphs
+        if PlasmoBenders._check_is_MIP(g)
+            optimizer.is_MIP = true
+            return nothing
+        end
+    end
+    optimizer.is_MIP = false
+    return nothing
+end
+
+function _check_is_MIP(rgraph::Plasmo.RemoteOptiGraph)
+    f = @spawnat rgraph.worker begin
+        lg = Plasmo.local_graph(rgraph)
+        vars = all_variables(lg)
+        bool_val = any(JuMP.is_binary.(vars)) || any(JuMP.is_integer.(vars))
+        bool_val
+    end
+    return fetch(f)
 end
 
 function _get_objects(optimizer::BendersAlgorithm{T}) where {T <: Plasmo.AbstractOptiGraph}
@@ -452,4 +478,95 @@ for field in _options_real_fields
         $method(optimizer::BendersAlgorithm, val::Real) = optimizer.options.$field = val
     end
     @eval export $method
+end
+
+function _get_binary_bool_vector(object::RemoteOptiGraph)
+    f = @spawnat object.worker begin
+        lg = Plasmo.local_graph(object)
+        PlasmoBenders._get_binary_bool_vector(lg)
+    end
+    return fetch(f)
+end
+
+function _get_integer_bool_vector(object::RemoteOptiGraph)
+    f = @spawnat object.worker begin
+        lg = Plasmo.local_graph(object)
+        PlasmoBenders._get_integer_bool_vector(lg)
+    end
+    return fetch(f)
+end
+
+function _get_binary_bool_vector(object::OptiGraph)
+    all_vars = all_variables(object)
+    return JuMP.is_binary.(all_vars)
+end
+
+function _get_integer_bool_vector(object::OptiGraph)
+    all_vars = all_variables(object)
+    return JuMP.is_integer.(all_vars)
+end
+
+function _get_object_last_solutions(object::OptiGraph)
+    vars = JuMP.all_variables(object)
+    return [JuMP.value(object, var) for var in vars]
+end
+
+function _get_object_last_solutions(object::RemoteOptiGraph)
+    f = @spawnat object.worker begin
+        lg = Plasmo.local_graph(object)
+        PlasmoBenders._get_object_last_solutions(lg)
+    end
+    return fetch(f)
+end
+
+function _get_variable_values(object::OptiGraph, variables::Vector{Plasmo.NodeVariableRef})
+    return [value(object, var) for var in variables]
+end
+
+function _get_variable_values(object::RemoteOptiGraph, variables::Vector{Plasmo.RemoteVariableRef})
+    f = @spawnat object.worker begin
+        lg = Plasmo.local_graph(object)
+        lvars = Plasmo.remote_var_to_local.(variables)
+        PlasmoBenders._get_variable_values(lg, lvars)
+    end
+    return fetch(f)
+end
+
+function _get_dual_vector(object::OptiGraph, variables::Vector{Plasmo.NodeVariableRef})
+    return Float64[JuMP.dual(object, FixRef(var)) for var in variables]
+end
+
+function _get_dual_vector(object::RemoteOptiGraph, variables::Vector{Plasmo.RemoteVariableRef})
+    f = @spawnat object.worker begin
+        lg = Plasmo.local_graph(object)
+        lvars = Plasmo.remote_var_to_local.(variables)
+        PlasmoBenders._get_dual_vector(lg, lvars)
+    end
+    return fetch(f)
+end
+
+function _fix_variables(object::OptiGraph, variables::Vector{Plasmo.NodeVariableRef}, values::Vector{Float64})
+    JuMP.fix.(variables, values, force = true)
+end
+
+function _fix_variables(object::RemoteOptiGraph, variables::Vector{Plasmo.RemoteVariableRef}, values::Vector{Float64})
+    f = @spawnat object.worker begin
+        lg = Plasmo.local_graph(object)
+        lvars = Plasmo.remote_var_to_local.(variables)
+        PlasmoBenders._fix_variables(lg, lvars, values)
+    end
+    return nothing
+end
+
+function _unfix_variables(object::OptiGraph, variables::Vector{Plasmo.NodeVariableRef})
+    JuMP.unfix.(variables)
+end
+
+function _unfix_variables(object::RemoteOptiGraph, variables::Vector{Plasmo.RemoteVariableRef})
+    f = @spawnat object.worker begin
+        lg = Plasmo.local_graph(object)
+        lvars = Plasmo.remote_var_to_local.(variables)
+        PlasmoBenders._unfix_variables(lg, lvars)
+    end
+    return nothing
 end

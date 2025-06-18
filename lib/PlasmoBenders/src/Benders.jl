@@ -363,21 +363,28 @@ function BendersAlgorithm(
         optimizer = BendersAlgorithm{T, V}()
         optimizer.graph = graph
 
+        println("SETTING ARGUMENTS")
         set_strengthened!(optimizer, strengthened)
+        println("set strengthened")
         set_multicut!(optimizer, multicut)
+        println("set multicut")
         set_feasibility_cuts!(optimizer, feasibility_cuts)
         set_regularize!(optimizer, regularize)
         set_parallelize_benders!(optimizer, parallelize_benders)
         set_parallelize_forward!(optimizer, parallelize_forward)
         set_parallelize_backward!(optimizer, parallelize_backward)
+        println("set parallelization")
         set_add_slacks!(optimizer, add_slacks)
         set_fix_slacks!(optimizer, fix_slacks)
         set_warm_start!(optimizer, warm_start)
         set_relaxed_init_cuts!(optimizer, relaxed_init_cuts)
 
+        println("set more parameters")
+
         set_slack_penalty!(optimizer, slack_penalty)
         set_regularize_param!(optimizer, regularize_param)
 
+        println("Checking warn statements")
         if parallelize_forward
             @warn("`parallelize_forward` is not yet supported. Benders will run, but the forward pass will not be parallelized")
         end
@@ -401,14 +408,17 @@ function BendersAlgorithm(
             set_multicut!(optimizer, true)
         end
 
+        println("Setting data like root objects")
         # Set initial data
         optimizer.root_object = root_object
         optimizer.max_iters = max_iters
         optimizer.time_limit = time_limit
+        println("Setting more data")
         optimizer.tol = tol
         optimizer.M = M
         optimizer.feasibility_map[root_object] = true
 
+        println("checking is_MIP")
         # Set is_MIP
         if isnothing(is_MIP)
             _set_is_MIP(optimizer)
@@ -416,6 +426,7 @@ function BendersAlgorithm(
             optimizer.is_MIP = is_MIP
         end
 
+        println("SETTING SOLVER")
         # Set solver if it is defined
         if !isnothing(solver)
             set_optimizer(optimizer.graph, solver)
@@ -429,8 +440,10 @@ function BendersAlgorithm(
         # Add start object
         push!(optimizer.solve_order, root_object)
 
+        println("Running ext")
         _init_ext!(optimizer)
 
+        println("Adding second object")
         # Add second object to solve order
         _add_second_object!(optimizer, get_relaxed_init_cuts(optimizer))
 
@@ -471,21 +484,33 @@ function BendersAlgorithm(
         var_to_graph_map = optimizer.var_to_graph_map
         # Create mapping of binary and integer variables on each node
         for (i, object) in enumerate(optimizer.solve_order)
+            println(i)
             object_var_solution_map = Dict{V, Int}()
             all_vars = all_variables(object)
 
             bin_value_dict = Dict{V, Float64}()
             int_value_dict = Dict{V, Float64}()
-            for (j, var) in enumerate(all_vars)
-                if JuMP.is_binary(var)
-                    bin_value_dict[var] = 0
-                elseif JuMP.is_integer(var)
-                    int_value_dict[var] = 0
+
+            binary_bool_vec = _get_binary_bool_vector(object)
+            integer_bool_vec = _get_integer_bool_vector(object)
+            for i in 1:length(binary_bool_vec)
+                if binary_bool_vec[i]
+                    bin_value_dict[all_vars[idx]] = 0
                 end
+            end
+            for i in 1:length(integer_bool_vec)
+                if integer_bool_vec[i]
+                    int_value_dict[all_vars[i]] = 0
+                end
+            end
+
+            for (j, var) in enumerate(all_vars)
                 object_var_solution_map[var] = j
                 var_to_graph_map[var] = object
             end
 
+            # TODO: Maybe save solutions on the remote workers or each individual subgraph
+            # the challenge here is that we need to make sure we are saving remotely
             optimizer.var_solution_map[object] = object_var_solution_map
             optimizer.binary_map[object] = bin_value_dict
             optimizer.integer_map[object] = int_value_dict
@@ -687,15 +712,14 @@ function _forward_pass!(optimizer::BendersAlgorithm)
         next_objects = optimizer.solve_order_dict[root_object]
         for object in next_objects
             next_comp_vars = optimizer.comp_vars[object]
-            last_primals = [JuMP.value(root_object, var) for var in next_comp_vars]
+            last_primals = _get_variable_values(root_object, next_comp_vars)
 
             primal_iters = optimizer.primal_iters[object]
             optimizer.primal_iters[object] = hcat(primal_iters, last_primals)
         end
 
-        # Save the solutions
-        next_object_vars = JuMP.all_variables(root_object)
-        optimizer.last_solutions[root_object] = [JuMP.value(root_object, var) for var in next_object_vars]
+        # Save the solutions #FIX
+        optimizer.last_solutions[root_object] = _get_object_last_solutions(root_object)
     end
 
     ############# Solve each successive object #################

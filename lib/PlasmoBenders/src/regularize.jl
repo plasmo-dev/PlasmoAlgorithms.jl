@@ -22,7 +22,7 @@ end
 
 function _construct_regularize!(
     optimizer::BendersAlgorithm{T}
-) where {T <: Union{Plasmo.OptiGraph, Plasmo.OptiNode}}
+) where {T <: Union{Plasmo.OptiGraph, Plasmo.RemoteOptiGraph}}
     for (i, object) in enumerate(optimizer.solve_order)
         next_objects = optimizer.solve_order_dict[object]
         if length(next_objects) > 0
@@ -42,7 +42,7 @@ function _regularize_pass!(
     optimizer::BendersAlgorithm{T},
     object,
     ub
-) where {T <: Union{Plasmo.OptiGraph, Plasmo.OptiNode}}
+) where {T <: Union{Plasmo.OptiGraph, Plasmo.RemoteOptiGraph}}
     next_objects = optimizer.solve_order_dict[object]
     if length(next_objects) > 0
         original_objective = get_regularize_objective_function(optimizer)[object]

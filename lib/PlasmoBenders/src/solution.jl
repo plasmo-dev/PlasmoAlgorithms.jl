@@ -6,16 +6,10 @@ function _add_cut_constraint!(
 ) where {T <: Plasmo.AbstractOptiGraph, V1 <: Union{GenericAffExpr, JuMP.AbstractVariableRef}, V2 <: JuMP.AbstractVariableRef}
 
     if length(rhs_expr.terms) != 0
-        #if length(unique(JuMP.owner_model.(keys(rhs_expr.terms)))) =< 1 #TODO: FIx this!
-        #    @constraint(JuMP.owner_model(theta_expr), theta_expr >= rhs_expr)
-        #else
         @linkconstraint(last_object, theta_expr >= rhs_expr)
-        #end
     else
         @constraint(JuMP.owner_model(theta_expr), theta_expr >= rhs_expr)
     end
-
-    #MOI.Utilities.reset_optimizer(last_object)
 end
 
 function _add_feasibility_cut_constraint!(
@@ -147,9 +141,11 @@ function _optimize_in_forward_pass!(optimizer, i, ub) #TODO: Type this function
     last_primals = primal_iters[:, size(primal_iters, 2)]
 
     # Fix primal solutions
-    for (j, var) in enumerate(comp_vars)
-        JuMP.fix(var_copy_map[var], last_primals[j], force = true)
-    end
+    var_copies = [var_copy_map[var] for var in comp_vars]
+    PlasmoBenders._fix_variables(next_object, var_copies, last_primals)
+    #for (j, var) in enumerate(comp_vars)
+    #    JuMP.fix(var_copy_map[var], last_primals[j], force = true)
+    #end
 
     # Optimize the next node
     optimize!(next_object)
@@ -170,9 +166,10 @@ function _optimize_in_forward_pass!(optimizer, i, ub) #TODO: Type this function
 
     _check_fixed_slacks!(optimizer, next_object)
 
-    for (j, var) in enumerate(comp_vars)
-        JuMP.unfix(var_copy_map[var])
-    end
+    PlasmoBenders._unfix_variables(next_object, var_copies)
+    #for (j, var) in enumerate(comp_vars)
+    #    JuMP.unfix(var_copy_map[var])
+    #end
 end
 
 function _save_forward_pass_solutions(optimizer, next_object, ub)
@@ -196,7 +193,7 @@ function _save_forward_pass_solutions(optimizer, next_object, ub)
         next_objects = optimizer.solve_order_dict[next_object]
         for object in next_objects
             next_comp_vars = optimizer.comp_vars[object]
-            last_primals = [JuMP.value(next_object, var) for var in next_comp_vars]
+            last_primals = _get_variable_values(next_object, next_comp_vars)#[JuMP.value(next_object, var) for var in next_comp_vars]
 
             primal_iters = optimizer.primal_iters[object]
             optimizer.primal_iters[object] = hcat(primal_iters, last_primals)
@@ -212,8 +209,7 @@ function _save_forward_pass_solutions(optimizer, next_object, ub)
         end
 
         # Save the solutions
-        next_object_vars = JuMP.all_variables(next_object)
-        optimizer.last_solutions[next_object] = [JuMP.value(next_object, var) for var in next_object_vars]
+        optimizer.last_solutions[next_object] = _get_object_last_solutions(next_object)
     end
 end
 
@@ -266,9 +262,11 @@ function _optimize_in_backward_pass(optimizer, i)
         last_primals = primal_iters[:, size(primal_iters, 2)]
 
         # Fix primal solutions
-        for (j, var) in enumerate(comp_vars)
-            JuMP.fix(var_copy_map[var], last_primals[j], force = true)
-        end
+        var_copies = [var_copy_map[var] for var in comp_vars]
+        PlasmoBenders._fix_variables(object, var_copies, last_primals)
+        #for (j, var) in enumerate(comp_vars)
+        #    JuMP.fix(var_copy_map[var], last_primals[j], force = true)
+        #end
     end
 
     # Optimize the next node
@@ -297,10 +295,11 @@ function _optimize_in_backward_pass(optimizer, i)
         optimizer.dual_iters[object] = hcat(dual_iters, next_duals)
         push!(optimizer.phis[object], next_phi)
 
-        # Fix primal solutions
-        for (j, var) in enumerate(comp_vars)
-            JuMP.unfix(var_copy_map[var])
-        end
+        # Unfix primal solutions
+        PlasmoBenders._unfix_variables(object, var_copies)
+        #for (j, var) in enumerate(comp_vars)
+        #    JuMP.unfix(var_copy_map[var])
+        #end
     end
 
     _check_fixed_slacks!(optimizer, object)
@@ -486,7 +485,7 @@ function _add_initial_relaxed_cuts!(
             comp_vars = optimizer.comp_vars[object]
 
             next_duals = JuMP.dual.(link_cons)
-            last_primals = [JuMP.value(object, comp_var) for comp_var in comp_vars]
+            last_primals = _get_variable_values(object, comp_vars)#[JuMP.value(object, comp_var) for comp_var in comp_vars]
             next_phi = JuMP.value(object, JuMP.objective_function(object))
 
             dual_iters = optimizer.dual_iters[object]

@@ -9,11 +9,6 @@ function _init_ext!(optimizer::BendersAlgorithm{T, V}) where {T <: Plasmo.Abstra
 
     # Build mappings
     for (i, g) in enumerate(subgraphs)
-        vars = JuMP.all_variables(g)
-        for (j, var) in enumerate(vars)
-            var_to_graph_map[var] = g
-        end
-
         nodes = all_nodes(g)
         for (j, node) in enumerate(nodes)
             node_to_graph_map[node] = g
@@ -23,7 +18,6 @@ function _init_ext!(optimizer::BendersAlgorithm{T, V}) where {T <: Plasmo.Abstra
     E = Plasmo.edge_type(graph)
 
     # Save mappings to the optimizer object
-    optimizer.ext["var_to_graph"] = var_to_graph_map #TODO: Make a new structure
     optimizer.ext["node_to_graph"] = node_to_graph_map
     optimizer.ext["theta_vars"] = Dict{T, Vector{V}}()
     optimizer.ext["is_overlapped"] = false
@@ -38,7 +32,6 @@ function _add_second_object!(optimizer::BendersAlgorithm{T, V}, relaxed) where {
     parent_objects = optimizer.parent_objects
     solve_order_dict = optimizer.solve_order_dict
 
-    var_to_graph_map = optimizer.ext["var_to_graph"]
     node_to_graph_map = optimizer.ext["node_to_graph"]
 
     optimizer.ext["search_next"] = Vector{T}()
