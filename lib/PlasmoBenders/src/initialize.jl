@@ -47,19 +47,6 @@ function _add_second_object!(optimizer::BendersAlgorithm{T, V}, relaxed) where {
     for (i, edge) in enumerate(edges)
         nodes = edge.nodes
         for (j, node) in enumerate(nodes)
-            # keyvec = collect(keys(node_to_graph_map))
-            # for n in keyvec
-            #     if n.node_idx == node.node_idx
-            #         println("labels = ", n.node_label, "  ", node.node_label)
-            #         println(n.node_label == node.node_label)
-            #         println("idx = ", n.node_idx, "  ", node.node_idx)
-            #         println(n.node_idx == node.node_idx)
-            #         println("graph labels = ", n.remote_graph.label, "   ", node.remote_graph.label)
-            #         println(n.remote_graph == node.remote_graph)
-            #         println(n == node)
-            #     end
-            # end
-            
             node_graph = node_to_graph_map[node]
             if node_graph != root_object
                 if !(node_graph in graphs)
@@ -130,8 +117,8 @@ function _add_complicating_variables!(
     last_nodes = all_nodes(last_object)
     next_nodes = all_nodes(next_object)
 
-    last_object_vars = all_variables(last_object)
-    next_object_vars = all_variables(next_object)
+    #last_object_vars = all_variables(last_object)
+    #next_object_vars = all_variables(next_object)
 
     # Get incident edges between last and next objects
     last_object_optiedges = Plasmo.incident_edges(optimizer, graph, last_object)

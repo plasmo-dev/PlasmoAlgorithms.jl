@@ -153,13 +153,23 @@ function relative_gap(optimizer::BendersAlgorithm)
 end
 
 # Define function for warm starting
-function _warm_start(optimizer::BendersAlgorithm, object)
+function _warm_start(optimizer::BendersAlgorithm{Plasmo.OptiGraph}, object::Plasmo.OptiGraph)
     all_vars = all_variables(object)
     all_vals = optimizer.best_solutions[object]
 
     # Set the start value for each variable
     for j in 1:length(all_vars)
         JuMP.set_start_value(all_vars[j], all_vals[j])
+    end
+end
+
+function _warm_start(optimizer::BendersAlgorithm{Plasmo.RemoteOptiGraph}, object::Plasmo.RemoteOptiGraph)
+    all_vals = optimizer.best_solutions[object]
+
+    f = @spawnat object.worker begin
+        lg = Plasmo.local_graph(object)
+        all_vars = all_variables(lg)
+        JuMP.set_start_value.(all_vars, all_vals)
     end
 end
 

@@ -440,17 +440,14 @@ function BendersAlgorithm(
         # Add start object
         push!(optimizer.solve_order, root_object)
 
-        println("Running ext")
         _init_ext!(optimizer)
 
-        println("Adding second object")
         # Add second object to solve order
         _add_second_object!(optimizer, get_relaxed_init_cuts(optimizer))
 
         while length(optimizer.ext["search_next"]) > 0
             search_next = optimizer.ext["search_next"][1]
             parent_object = optimizer.parent_objects[search_next]
-
             ############### Add complicating variables ##############
             # Get the linking constraints between last and current node
             _add_complicating_variables!(optimizer, parent_object, search_next, get_add_slacks(optimizer), get_slack_penalty(optimizer))
@@ -484,7 +481,6 @@ function BendersAlgorithm(
         var_to_graph_map = optimizer.var_to_graph_map
         # Create mapping of binary and integer variables on each node
         for (i, object) in enumerate(optimizer.solve_order)
-            println(i)
             object_var_solution_map = Dict{V, Int}()
             all_vars = all_variables(object)
 

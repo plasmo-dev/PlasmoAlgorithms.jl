@@ -57,15 +57,18 @@ function _regularize_pass!(
             @linkconstraint(object, _reg_con, original_objective <= rhs)
         end
 
-        @objective(object, Min, 0 * all_variables(object)[1])
+        V = Plasmo.variable_type(optimizer.graph)
+        @objective(object, Min, GenericAffExpr{Float64, V}(0.0))
 
         optimize!(object)
+
         if termination_status(object) != MOI.INFEASIBLE
-            ub[1] += value(object, original_objective) - _theta_value(optimizer, object)
-            get_regularize_ubs(optimizer)[object] = value(object, original_objective) - _theta_value(optimizer, object)
+            obj_val_minus_theta = value(object, original_objective) - _theta_value(optimizer, object)
+            ub[1] += obj_val_minus_theta
+            get_regularize_ubs(optimizer)[object] = obj_val_minus_theta
             for next_object in next_objects
                 comp_vars = optimizer.comp_vars[next_object]
-                last_primals = JuMP.value.(comp_vars)
+                last_primals = _get_variable_values(object, comp_vars)
 
                 old_primals = optimizer.primal_iters[next_object]
                 optimizer.primal_iters[next_object] = hcat(old_primals, last_primals)
@@ -89,8 +92,7 @@ function _regularize_pass!(
         end
 
         # Save the solutions
-        object_vars = JuMP.all_variables(object)
-        optimizer.last_solutions[object] = JuMP.value.(object_vars)
+        optimizer.last_solutions[object] = _get_object_last_solutions(object)
 
         @objective(object, Min, original_objective)
 
@@ -112,8 +114,7 @@ function _regularize_pass!(
         end
 
         # Save the solutions
-        object_vars = JuMP.all_variables(object)
-        optimizer.last_solutions[object] = JuMP.value.(object_vars)
+        optimizer.last_solutions[object] = _get_object_last_solutions(object)
     end
 end
 
@@ -132,4 +133,14 @@ function _init_regularize_bounds!(optimizer::BendersAlgorithm)
             get_regularize_ubs(optimizer)[parent_object] += get_regularize_ubs(optimizer)[object]
         end
     end
+end
+
+function MOI.delete(redge::RemoteEdgeRef, rcref::ConstraintRef)
+    rgraph = redge.remote_graph
+    f = @spawnat rgraph.worker begin
+        ledge = Plasmo._convert_remote_to_local(rgraph, redge)
+        cref = Plasmo._convert_remote_to_local(rgraph, rcref)
+        MOI.delete(ledge, cref)
+    end
+    return nothing
 end
