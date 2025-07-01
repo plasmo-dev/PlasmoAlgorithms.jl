@@ -491,7 +491,7 @@ function BendersAlgorithm(
             integer_bool_vec = _get_integer_bool_vector(object)
             for i in 1:length(binary_bool_vec)
                 if binary_bool_vec[i]
-                    bin_value_dict[all_vars[idx]] = 0
+                    bin_value_dict[all_vars[i]] = 0
                 end
             end
             for i in 1:length(integer_bool_vec)
