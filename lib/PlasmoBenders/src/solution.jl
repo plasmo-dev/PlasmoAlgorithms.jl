@@ -219,6 +219,10 @@ end
 function _save_feasibility_cut_data(optimizer, next_object, ub)
     # See JuMP documentation for implementation of this method:
     # https://jump.dev/JuMP.jl/stable/tutorials/algorithms/benders_decomposition/#Feasibility-cuts
+
+    ub[1] = Inf
+
+    # Save primal information to upcoming objects
     if !optimizer.is_MIP
         obj_val = JuMP.dual_objective_value(next_object)
 
@@ -228,12 +232,7 @@ function _save_feasibility_cut_data(optimizer, next_object, ub)
         else
             theta_val = 0
         end
-    end
-
-    # Save primal information to upcoming objects
-    ub[1] = Inf
-
-    if !optimizer.is_MIP
+        
         next_duals = _get_next_duals(optimizer, next_object)
         dual_iters = optimizer.dual_iters[next_object]
         optimizer.dual_iters[next_object] = hcat(dual_iters, next_duals)
