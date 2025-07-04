@@ -326,7 +326,10 @@ function _add_strengthened_cuts!(optimizer::BendersAlgorithm)
     # Loop through each object and add strengthened Benders cut
     Threads.@threads for i in 1:(length(optimizer.solve_order) - 1)
     #for i in 1:(length(optimizer.solve_order) - 1)
-        _solve_for_strengthened_cuts(optimizer, i)
+        next_object = optimizer.solve_order[i + 1]
+        if optimizer.feasibility_map[next_object]
+            _solve_for_strengthened_cuts(optimizer, i)
+        end
     end
 
     for i in 1:(length(optimizer.solve_order))
@@ -338,51 +341,74 @@ function _add_strengthened_cuts!(optimizer::BendersAlgorithm)
             agg_rhs_expr_LR = GenericAffExpr{Float64, Plasmo.NodeVariableRef}()
 
             for (j, object) in enumerate(next_objects)
-                rhs_expr = GenericAffExpr{Float64, Plasmo.NodeVariableRef}()
-                rhs_expr_LR = GenericAffExpr{Float64, Plasmo.NodeVariableRef}()
+                if optimizer.feasibility_map[object]
+                    rhs_expr = GenericAffExpr{Float64, Plasmo.NodeVariableRef}()
+                    rhs_expr_LR = GenericAffExpr{Float64, Plasmo.NodeVariableRef}()
 
-                # Complicating variables are on previous object
-                comp_vars = optimizer.comp_vars[object]
+                    # Complicating variables are on previous object
+                    comp_vars = optimizer.comp_vars[object]
 
-                # Phi is the solution of the previous object
-                phis = optimizer.phis[object]
-                phis_LR = optimizer.phis_LR[object]
+                    # Phi is the solution of the previous object
+                    phis = optimizer.phis[object]
+                    phis_LR = optimizer.phis_LR[object]
 
-                next_phi = phis[length(phis)]
-                next_phi_LR = phis_LR[length(phis_LR)]
+                    next_phi = phis[length(phis)]
+                    next_phi_LR = phis_LR[length(phis_LR)]
 
-                # Values of the complicating variables at last iteration
-                primal_iters = optimizer.primal_iters[object]
-                last_primals = primal_iters[:, size(primal_iters, 2)]
+                    # Values of the complicating variables at last iteration
+                    primal_iters = optimizer.primal_iters[object]
+                    last_primals = primal_iters[:, size(primal_iters, 2)]
 
-                # Dual variables come from the linking of complicating variables to the next object
-                dual_iters = optimizer.dual_iters[object]
-                next_duals = dual_iters[:, size(dual_iters, 2)]
+                    # Dual variables come from the linking of complicating variables to the next object
+                    dual_iters = optimizer.dual_iters[object]
+                    next_duals = dual_iters[:, size(dual_iters, 2)]
 
-                add_to_expression!(rhs_expr, next_phi)
-                for k in 1:length(comp_vars)
-                    add_to_expression!(rhs_expr, next_duals[k] * (comp_vars[k] - last_primals[k]))
-                end
+                    add_to_expression!(rhs_expr, next_phi)
+                    for k in 1:length(comp_vars)
+                        add_to_expression!(rhs_expr, next_duals[k] * (comp_vars[k] - last_primals[k]))
+                    end
 
-                add_to_expression!(rhs_expr_LR, next_phi_LR)
-                for k in 1:length(comp_vars)
-                    add_to_expression!(rhs_expr_LR, next_duals[k] * (comp_vars[k] - last_primals[k]))
-                end
-                if get_multicut(optimizer)
-                    theta_var = _get_theta(optimizer, last_object, j)
-                    if rhs_expr.constant > rhs_expr_LR.constant
-                        _add_cut_constraint!(optimizer, last_object, theta_var, rhs_expr)
+                    add_to_expression!(rhs_expr_LR, next_phi_LR)
+                    for k in 1:length(comp_vars)
+                        add_to_expression!(rhs_expr_LR, next_duals[k] * (comp_vars[k] - last_primals[k]))
+                    end
+                    if get_multicut(optimizer)
+                        theta_var = _get_theta(optimizer, last_object, j)
+                        if rhs_expr.constant > rhs_expr_LR.constant
+                            _add_cut_constraint!(optimizer, last_object, theta_var, rhs_expr)
+                        else
+                            _add_cut_constraint!(optimizer, last_object, theta_var, rhs_expr_LR)
+                        end
                     else
-                        _add_cut_constraint!(optimizer, last_object, theta_var, rhs_expr_LR)
+                        add_to_expression!(agg_rhs_expr, rhs_expr)
+                        add_to_expression!(agg_rhs_expr_LR, rhs_expr_LR)
                     end
                 else
-                    add_to_expression!(agg_rhs_expr, rhs_expr)
-                    add_to_expression!(agg_rhs_expr_LR, rhs_expr_LR)
-                end
+                    rhs_expr = GenericAffExpr{Float64, Plasmo.NodeVariableRef}()
+                    # Complicating variables are on previous object
+                    comp_vars = optimizer.comp_vars[object]
 
+                    # Phi is the solution of the previous object
+                    phis = optimizer.phis[object]
+                    next_phi = phis[length(phis)]
+
+                    # Values of the complicating variables at last iteration
+                    primal_iters = optimizer.primal_iters[object]
+                    last_primals = primal_iters[:, size(primal_iters, 2)]
+
+                    # Dual variables come from the linking of complicating variables to the next object
+                    dual_iters = optimizer.dual_iters[object]
+                    next_duals = dual_iters[:, size(dual_iters, 2)]
+                    add_to_expression!(rhs_expr, next_phi)
+                    for k in 1:length(comp_vars)
+                        add_to_expression!(rhs_expr, next_duals[k] * (comp_vars[k] - last_primals[k]))
+                    end
+                    theta_var = _get_theta(optimizer, last_object, j)
+                    _add_feasibility_cut_constraint!(optimizer, last_object, rhs_expr)
+                end
             end
 
-            if !(get_multicut(optimizer))
+            if !(get_multicut(optimizer)) && !(get_feasibility_cuts(optimizer))
                 theta_vars = _get_theta(optimizer, last_object)
                 theta_expr = sum(theta_vars[k] for k in 1:length(theta_vars))
                 if agg_rhs_expr.constant > agg_rhs_expr_LR.constant
