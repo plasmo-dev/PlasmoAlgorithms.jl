@@ -363,28 +363,21 @@ function BendersAlgorithm(
         optimizer = BendersAlgorithm{T, V}()
         optimizer.graph = graph
 
-        println("SETTING ARGUMENTS")
         set_strengthened!(optimizer, strengthened)
-        println("set strengthened")
         set_multicut!(optimizer, multicut)
-        println("set multicut")
         set_feasibility_cuts!(optimizer, feasibility_cuts)
         set_regularize!(optimizer, regularize)
         set_parallelize_benders!(optimizer, parallelize_benders)
         set_parallelize_forward!(optimizer, parallelize_forward)
         set_parallelize_backward!(optimizer, parallelize_backward)
-        println("set parallelization")
         set_add_slacks!(optimizer, add_slacks)
         set_fix_slacks!(optimizer, fix_slacks)
         set_warm_start!(optimizer, warm_start)
         set_relaxed_init_cuts!(optimizer, relaxed_init_cuts)
 
-        println("set more parameters")
-
         set_slack_penalty!(optimizer, slack_penalty)
         set_regularize_param!(optimizer, regularize_param)
 
-        println("Checking warn statements")
         if parallelize_forward
             @warn("`parallelize_forward` is not yet supported. Benders will run, but the forward pass will not be parallelized")
         end
@@ -408,17 +401,14 @@ function BendersAlgorithm(
             set_multicut!(optimizer, true)
         end
 
-        println("Setting data like root objects")
         # Set initial data
         optimizer.root_object = root_object
         optimizer.max_iters = max_iters
         optimizer.time_limit = time_limit
-        println("Setting more data")
         optimizer.tol = tol
         optimizer.M = M
         optimizer.feasibility_map[root_object] = true
 
-        println("checking is_MIP")
         # Set is_MIP
         if isnothing(is_MIP)
             _set_is_MIP(optimizer)
@@ -426,7 +416,6 @@ function BendersAlgorithm(
             optimizer.is_MIP = is_MIP
         end
 
-        println("SETTING SOLVER")
         # Set solver if it is defined
         if !isnothing(solver)
             set_optimizer(optimizer.graph, solver)

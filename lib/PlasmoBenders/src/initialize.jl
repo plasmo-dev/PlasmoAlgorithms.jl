@@ -132,22 +132,28 @@ function _add_complicating_variables!(
     # Map complicating variables to their owning node and vice versa
     node_to_var = Dict{N, Vector{V}}()
     var_to_node = Dict{V, N}()
-
     # Loop through each edge
     for (i, edge) in enumerate(complicating_edges)
         # Loop through each linkref on each edge
+        next_object_nodes = all_nodes(next_object)
+        last_object_nodes = all_nodes(last_object)
+
         for (j, link) in enumerate(all_constraints(edge))
 
             con_obj = JuMP.constraint_object(link)
             vars = con_obj.func.terms.keys
 
-            next_object_link_vars = [var for var in vars if source_graph(JuMP.owner_model(var)) == next_object]
-            last_object_link_vars = [var for var in vars if source_graph(JuMP.owner_model(var)) == last_object]
-
+            next_object_link_vars = [var for var in vars if JuMP.owner_model(var) in next_object_nodes]
+            last_object_link_vars = [var for var in vars if JuMP.owner_model(var) in last_object_nodes]
             # Get the optinodes containing the next set of variables
             #next_optinode = optinode(next_object_vars[1]) #NEXT: Fix this!
 
             # Get the set of nodes in the next_object that are included in the constraint
+            if length(next_object_link_vars) == 0 || length(last_object_link_vars) == 0
+                error("link constraint does not connect nodes on upstream and/or downstream subgraphs " * 
+                    "This could be an error in modeling or a bug in the software"
+                )
+            end
             next_optinode = JuMP.owner_model(next_object_link_vars[1])
 
             # Map each complicating variable to the node where the
@@ -205,16 +211,9 @@ function _add_complicating_variables!(
     for node in keys(node_to_var)
         node_comp_vars = node_to_var[node]
 
-        varref_copy = @variable(node, _comp_vars_copy[1:length(node_comp_vars)])
+        varref_copy = _build_comp_vars_copies(node, length(node_comp_vars))
 
-        for (i, var) in enumerate(node_comp_vars)
-            if JuMP.has_lower_bound(var)
-                JuMP.set_lower_bound(varref_copy[i], lower_bound(var))
-            end
-
-            if JuMP.has_upper_bound(var)
-                JuMP.set_upper_bound(varref_copy[i], upper_bound(var))
-            end
+        for (i, var) in enumerate(node_comp_vars) 
             var_copy_map[var] = varref_copy[i]
         end
     end
@@ -235,13 +234,15 @@ function _add_complicating_variables!(
     # Loop through the complicating edges; decide if a constraint on the edge
     # requires a normal or a linking constraint
     for (i, edge) in enumerate(complicating_edges)
+        # Get the variables from the constraint in the next_object
+        next_object_nodes = all_nodes(next_object)
+        last_object_nodes = all_nodes(last_object)
         for (j, link) in enumerate(all_constraints(edge))
             con_obj = JuMP.constraint_object(link)
             vars = con_obj.func.terms.keys
-
-            # Get the variables from the constraint in the next_object
-            next_object_link_vars = [var for var in vars if source_graph(JuMP.owner_model(var)) == next_object]
-            last_object_link_vars = [var for var in vars if source_graph(JuMP.owner_model(var)) == last_object]
+            
+            next_object_link_vars = [var for var in vars if JuMP.owner_model(var) in next_object_nodes]
+            last_object_link_vars = [var for var in vars if JuMP.owner_model(var) in last_object_nodes]
             next_object_copy_vars = [var_copy_map[var] for var in last_object_link_vars]
 
             # Get the set of nodes in the next_object that are included in the constraint
@@ -282,51 +283,56 @@ function _add_complicating_variables!(
         # Loop through nodes and add a normal constraint for constraints with complicating variables
         for node in keys(node_to_con)
             cons = node_to_con[node]
-            _add_slack_to_node(optimizer, next_object, node, length(cons), slack_penalty)
+            # _add_slack_to_node(optimizer, next_object, node, length(cons), slack_penalty)
 
-            for (j, con) in enumerate(cons)
-                con_obj = JuMP.constraint_object(con)
-                _add_constraint_to_subproblem!(con_obj, comp_vars, var_copy_map,
-                                              next_object, node, false; slack = true,
-                                              slack_up = node[:_slack_up][j],
-                                              slack_down = node[:_slack_down][j]
-                )
-            end
+            # for (j, con) in enumerate(cons)
+            #     con_obj = JuMP.constraint_object(con)
+            #     _add_constraint_to_subproblem!(con_obj, comp_vars, var_copy_map,
+            #                                   next_object, node, false; slack = true,
+            #                                   slack_up = node[:_slack_up][j],
+            #                                   slack_down = node[:_slack_down][j]
+            #     )
+            # end
+
+            _add_constraint_set_to_subproblem!(optimizer, cons, next_object, node, comp_vars, var_copy_map, false, true)
         end
         # Loop through nodes and add a linking constraint for constraints with complicating variables
         for node in keys(node_to_linking)
-            links = node_to_linking[node]
-            _add_slack_to_node_for_links(optimizer, next_object, node, length(links), slack_penalty)
+            cons = node_to_linking[node]
+            # _add_slack_to_node_for_links(optimizer, next_object, node, length(links), slack_penalty)
 
-            for (j, link) in enumerate(links)
-                con_obj = JuMP.constraint_object(link)
-                _add_constraint_to_subproblem!(con_obj, comp_vars, var_copy_map,
-                                              next_object, node, true; slack = true,
-                                              slack_up = node[:_slack_up_link][j],
-                                              slack_down = node[:_slack_down_link][j]
-                )
-            end
+            # for (j, link) in enumerate(links)
+            #     con_obj = JuMP.constraint_object(link)
+            #     _add_constraint_to_subproblem!(con_obj, comp_vars, var_copy_map,
+            #                                   next_object, node, true; slack = true,
+            #                                   slack_up = node[:_slack_up_link][j],
+            #                                   slack_down = node[:_slack_down_link][j]
+            #     )
+            # end
+            _add_constraint_set_to_subproblem!(optimizer, cons, next_object, node, comp_vars, var_copy_map, true, true)
         end
     else
         # Loop through nodes and add a normal constraint for constraints with complicating variables
         for node in keys(node_to_con)
             cons = node_to_con[node]
-            for (j, con) in enumerate(cons)
-                con_obj = JuMP.constraint_object(con)
-                _add_constraint_to_subproblem!(con_obj, comp_vars, var_copy_map,
-                                               next_object, node, false
-                )
-            end
+            # for (j, con) in enumerate(cons)
+            #     con_obj = JuMP.constraint_object(con)
+            #     _add_constraint_to_subproblem!(con_obj, comp_vars, var_copy_map,
+            #                                    next_object, node, false
+            #     )
+            # end
+            _add_constraint_set_to_subproblem!(optimizer, cons, next_object, node, comp_vars, var_copy_map, false, false)
         end
         # Loop through nodes and add a linking constraint for constraints with complicating variables
         for node in keys(node_to_linking)
             links = node_to_linking[node]
-            for (j, link) in enumerate(links)
-                con_obj = JuMP.constraint_object(link)
-                _add_constraint_to_subproblem!(con_obj, comp_vars, var_copy_map,
-                                               next_object, node, true
-                )
-            end
+            # for (j, link) in enumerate(links)
+            #     con_obj = JuMP.constraint_object(link)
+            #     _add_constraint_to_subproblem!(con_obj, comp_vars, var_copy_map,
+            #                                    next_object, node, true
+            #     )
+            # end
+            _add_constraint_set_to_subproblem!(optimizer, links, next_object, node, comp_vars, var_copy_map, true, false)
         end
     end
 end
@@ -338,8 +344,8 @@ function _add_next_object!(
     relaxed::Bool
 ) where {T <: Plasmo.AbstractOptiGraph, V <: JuMP.AbstractVariableRef}
     # Get the nodes from the last and next objects
-    next_object_nodes = all_nodes(next_object)
-    last_object_nodes = all_nodes(last_object)
+    #next_object_nodes = all_nodes(next_object)
+    #last_object_nodes = all_nodes(last_object)
 
     # Get the map from node to graph
     node_to_graph = optimizer.ext["node_to_graph"]
@@ -372,9 +378,6 @@ function _add_next_object!(
 
     ############# Add Cost-to-Go Variable #################
     # Add cost-to-go variable and add to objective function
-    _add_cost_to_go!(optimizer, next_object, relaxed)
-    #Plasmo._init_graph_backend(optimizer.graph)
-
     for g in next_graphs
         if g in optimizer.solve_order
             error("The subproblems do not form a tree")
