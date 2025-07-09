@@ -23,8 +23,8 @@ function _add_constraint_set_to_subproblem!(
             con_obj = JuMP.constraint_object(con)
                 _add_constraint_to_subproblem!(con_obj, comp_vars, var_copy_map,
                                               next_object, node, link; slack = slack,
-                                              slack_up = node[:_slack_up_link][j],
-                                              slack_down = node[:_slack_down_link][j]
+                                              slack_up = nothing,
+                                              slack_down = nothing
                 )
         end
     end
