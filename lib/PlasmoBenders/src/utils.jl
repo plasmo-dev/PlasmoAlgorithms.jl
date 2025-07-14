@@ -190,9 +190,10 @@ end
 
 function _warm_start(optimizer::BendersAlgorithm{Plasmo.RemoteOptiGraph}, object::Plasmo.RemoteOptiGraph)
     all_vals = optimizer.best_solutions[object]
+    darray = rgraph.graph
 
     f = @spawnat object.worker begin
-        lg = Plasmo.local_graph(object)
+        lg = Plasmo.local_graph(darray)
         all_vars = all_variables(lg)
         JuMP.set_start_value.(all_vars, all_vals)
     end
@@ -311,8 +312,9 @@ function _set_is_MIP(optimizer::BendersAlgorithm{Plasmo.RemoteOptiGraph})
 end
 
 function _check_is_MIP(rgraph::Plasmo.RemoteOptiGraph)
+    darray = rgraph.graph
     f = @spawnat rgraph.worker begin
-        lg = Plasmo.local_graph(rgraph)
+        lg = Plasmo.local_graph(darray)
         vars = all_variables(lg)
         bool_val = any(JuMP.is_binary.(vars)) || any(JuMP.is_integer.(vars))
         bool_val
@@ -516,16 +518,18 @@ for field in _options_real_fields
 end
 
 function _get_binary_bool_vector(object::RemoteOptiGraph)
+    darray = object.graph
     f = @spawnat object.worker begin
-        lg = Plasmo.local_graph(object)
+        lg = Plasmo.local_graph(darray)
         PlasmoBenders._get_binary_bool_vector(lg)
     end
     return fetch(f)
 end
 
 function _get_integer_bool_vector(object::RemoteOptiGraph)
+    darray = object.graph
     f = @spawnat object.worker begin
-        lg = Plasmo.local_graph(object)
+        lg = Plasmo.local_graph(darray)
         PlasmoBenders._get_integer_bool_vector(lg)
     end
     return fetch(f)
@@ -547,8 +551,9 @@ function _get_object_last_solutions(object::OptiGraph)
 end
 
 function _get_object_last_solutions(object::RemoteOptiGraph)
+    darray = object.graph
     f = @spawnat object.worker begin
-        lg = Plasmo.local_graph(object)
+        lg = Plasmo.local_graph(darray)
         PlasmoBenders._get_object_last_solutions(lg)
     end
     return fetch(f)
@@ -559,9 +564,11 @@ function _get_variable_values(object::OptiGraph, variables::Vector{Plasmo.NodeVa
 end
 
 function _get_variable_values(object::RemoteOptiGraph, variables::Vector{Plasmo.RemoteVariableRef})
+    darray = object.graph
+    pvars = [Plasmo._convert_remote_to_proxy(object, var) for var in variables]
     f = @spawnat object.worker begin
-        lg = Plasmo.local_graph(object)
-        lvars = Plasmo.remote_var_to_local.(variables)
+        lg = Plasmo.local_graph(darray)
+        lvars = [Plasmo._convert_proxy_to_local(lg, var) for var in pvars]
         PlasmoBenders._get_variable_values(lg, lvars)
     end
     return fetch(f)
@@ -572,9 +579,11 @@ function _get_dual_vector(object::OptiGraph, variables::Vector{Plasmo.NodeVariab
 end
 
 function _get_dual_vector(object::RemoteOptiGraph, variables::Vector{Plasmo.RemoteVariableRef})
+    darray = object.graph
+    pvars = [Plasmo._convert_remote_to_proxy(object, var) for var in variables]
     f = @spawnat object.worker begin
-        lg = Plasmo.local_graph(object)
-        lvars = Plasmo.remote_var_to_local.(variables)
+        lg = Plasmo.local_graph(darray)
+        lvars = [Plasmo._convert_proxy_to_local(lg, var) for var in pvars]
         PlasmoBenders._get_dual_vector(lg, lvars)
     end
     return fetch(f)
@@ -585,9 +594,12 @@ function _fix_variables(object::OptiGraph, variables::Vector{Plasmo.NodeVariable
 end
 
 function _fix_variables(object::RemoteOptiGraph, variables::Vector{Plasmo.RemoteVariableRef}, values::Vector{Float64})
+    darray = object.graph
+    pvars = [Plasmo._convert_remote_to_proxy(object, var) for var in variables]
     f = @spawnat object.worker begin
-        lg = Plasmo.local_graph(object)
-        lvars = Plasmo.remote_var_to_local.(variables)
+        lg = Plasmo.local_graph(darray)
+        lvars = [Plasmo._convert_proxy_to_local(lg, var) for var in pvars]
+
         PlasmoBenders._fix_variables(lg, lvars, values)
     end
     return nothing
@@ -598,9 +610,12 @@ function _unfix_variables(object::OptiGraph, variables::Vector{Plasmo.NodeVariab
 end
 
 function _unfix_variables(object::RemoteOptiGraph, variables::Vector{Plasmo.RemoteVariableRef})
+    darray = object.graph
+    pvars = [Plasmo._convert_remote_to_proxy(object, var) for var in variables]
     f = @spawnat object.worker begin
-        lg = Plasmo.local_graph(object)
-        lvars = Plasmo.remote_var_to_local.(variables)
+        lg = Plasmo.local_graph(darray)
+        lvars = [Plasmo._convert_proxy_to_local(lg, var) for var in pvars]
+
         PlasmoBenders._unfix_variables(lg, lvars)
     end
     return nothing

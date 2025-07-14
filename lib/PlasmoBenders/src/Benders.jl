@@ -674,9 +674,23 @@ function _forward_pass!(optimizer::BendersAlgorithm)
     ########## Solve the first node ############
     root_object = optimizer.solve_order[1]
 
+    # acs = all_constraints(root_object, include_variable_in_set_constraints = false)
+    # if optimizer.current_iter >= 6
+    #     offset = optimizer.current_iter - 6
+    #     set_normalized_rhs(acs[77 + offset], -1e9)
+    # end
+
     JuMP.optimize!(root_object)
 
     root_object_feasibility = _check_termination_status(optimizer, root_object, 1)
+
+    # acs = all_constraints(root_object, include_variable_in_set_constraints = false)
+    # lhs = [value(root_object, constraint_object(c).func) for c in acs[77:length(acs)]]
+    # rhs = [constraint_object(c).set.lower for c in acs[77:length(acs)]]
+    # comp_vals = [(lhs[i], rhs[i]) for i in 1:length(rhs)]
+    # condition = x -> abs(x[1] - x[2]) < 1e-4
+    # active_set_idxs = findall(condition, comp_vals)
+    # println("active constraint refs: ", active_set_idxs, " out of $(length(acs)-76) constraints")
 
     # Get initial objective
     root_objective = JuMP.objective_value(root_object)

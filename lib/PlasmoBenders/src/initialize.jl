@@ -141,10 +141,12 @@ function _add_complicating_variables!(
         for (j, link) in enumerate(all_constraints(edge))
 
             con_obj = JuMP.constraint_object(link)
-            vars = con_obj.func.terms.keys
 
-            next_object_link_vars = [var for var in vars if JuMP.owner_model(var) in next_object_nodes]
-            last_object_link_vars = [var for var in vars if JuMP.owner_model(var) in last_object_nodes]
+            vars, next_object_link_vars, last_object_link_vars = _get_con_obj_var_sets(con_obj, next_object_nodes, last_object_nodes)
+            # vars = con_obj.func.terms.keys
+
+            # next_object_link_vars = [var for var in vars if JuMP.owner_model(var) in next_object_nodes]
+            # last_object_link_vars = [var for var in vars if JuMP.owner_model(var) in last_object_nodes]
             # Get the optinodes containing the next set of variables
             #next_optinode = optinode(next_object_vars[1]) #NEXT: Fix this!
 
@@ -239,10 +241,17 @@ function _add_complicating_variables!(
         last_object_nodes = all_nodes(last_object)
         for (j, link) in enumerate(all_constraints(edge))
             con_obj = JuMP.constraint_object(link)
-            vars = con_obj.func.terms.keys
+
             
-            next_object_link_vars = [var for var in vars if JuMP.owner_model(var) in next_object_nodes]
-            last_object_link_vars = [var for var in vars if JuMP.owner_model(var) in last_object_nodes]
+            vars, next_object_link_vars, last_object_link_vars = _get_con_obj_var_sets(con_obj, next_object_nodes, last_object_nodes)
+            # vars = con_obj.func.terms.keys
+
+            # next_object_link_vars = [var for var in vars if JuMP.owner_model(var) in next_object_nodes]
+            # last_object_link_vars = [var for var in vars if JuMP.owner_model(var) in last_object_nodes]
+            #vars = con_obj.func.terms.keys
+            
+            #next_object_link_vars = [var for var in vars if JuMP.owner_model(var) in next_object_nodes]
+            #last_object_link_vars = [var for var in vars if JuMP.owner_model(var) in last_object_nodes]
             next_object_copy_vars = [var_copy_map[var] for var in last_object_link_vars]
 
             # Get the set of nodes in the next_object that are included in the constraint
