@@ -360,7 +360,7 @@ function _check_termination_status(optimizer::BendersAlgorithm, object, count)
         end
     elseif termination_status(object) == MOI.INFEASIBLE_OR_UNBOUNDED
         error("Model on node/graph $count is unbounded or infeasible")
-    elseif (termination_status(object) != MOI.OPTIMAL) && (termination_status(object) != MOI.LOCALLY_SOLVED)
+    elseif (termination_status(object) != MOI.OPTIMAL) && (termination_status(object) != MOI.LOCALLY_SOLVED) && (termination_status(object) != MOI.TIME_LIMIT)
         error("Model on node/graph $count terminated with status $(termination_status(object))")
     end
     return true
