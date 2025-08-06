@@ -694,6 +694,8 @@ function _forward_pass!(optimizer::BendersAlgorithm)
 
     # Get initial objective
     root_objective = JuMP.objective_value(root_object)
+    #sols = [value(root_object, var) for var in all_variables(root_object)]
+    #optimizer.ext["root_sols"] = hcat(optimizer.ext["root_sols"], sols)
 
     # Initialize upper bound
     ub = [0.]
@@ -726,6 +728,9 @@ function _forward_pass!(optimizer::BendersAlgorithm)
         Threads.@threads for i in 2:(length(optimizer.solve_order))
             _optimize_in_forward_pass!(optimizer, i, ub)
         end
+        # @sync for i in 2:(length(optimizer.solve_order))
+        #     @async _optimize_in_forward_pass!(optimizer, i, ub)
+        # end
     else
         for i in 2:(length(optimizer.solve_order))
             _optimize_in_forward_pass!(optimizer, i, ub)
@@ -758,6 +763,10 @@ function _backward_pass!(optimizer::BendersAlgorithm; strengthened::Bool = false
         Threads.@threads for i in 1:len_solve_order
             _optimize_in_backward_pass(optimizer, i)
         end
+
+        # @sync for i in 1:len_solve_order
+        #     @async _optimize_in_backward_pass(optimizer, i)
+        # end
     else
         for i in 1:len_solve_order
             _optimize_in_backward_pass(optimizer, i)

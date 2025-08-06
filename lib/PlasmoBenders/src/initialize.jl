@@ -23,6 +23,10 @@ function _init_ext!(optimizer::BendersAlgorithm{T, V}) where {T <: Plasmo.Abstra
     optimizer.ext["is_overlapped"] = false
     optimizer.ext["incident_edges"] = Dict{T, Vector{E}}()
 
+    #root_obj = optimizer.root_object
+    #num_vars = JuMP.num_variables(root_obj)
+    #optimizer.ext["root_sols"] = zeros(num_vars+1, 0)
+
     return nothing
 end
 
