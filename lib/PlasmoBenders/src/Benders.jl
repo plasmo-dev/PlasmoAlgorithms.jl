@@ -401,6 +401,10 @@ function BendersAlgorithm(
             set_multicut!(optimizer, true)
         end
 
+        if isa(root_object, RemoteOptiGraph) && get_fix_slacks(optimizer)
+            error("`fix_slacks = true` is not currently supported for RemoteOptiGraphs")
+        end
+
         # Set initial data
         optimizer.root_object = root_object
         optimizer.max_iters = max_iters
@@ -725,16 +729,19 @@ function _forward_pass!(optimizer::BendersAlgorithm)
 
     ############# Solve each successive object #################
     if get_parallelize_benders(optimizer)
-        Threads.@threads for i in 2:(length(optimizer.solve_order))
-            _optimize_in_forward_pass!(optimizer, i, ub)
-        end
+
+        _optimize_in_forward_pass_multithread!(optimizer, ub)
+        #Threads.@threads for i in 2:(length(optimizer.solve_order))
+        #    _optimize_in_forward_pass!(optimizer, i, ub)
+        #end
         # @sync for i in 2:(length(optimizer.solve_order))
         #     @async _optimize_in_forward_pass!(optimizer, i, ub)
         # end
     else
-        for i in 2:(length(optimizer.solve_order))
-            _optimize_in_forward_pass!(optimizer, i, ub)
-        end
+        _optimize_in_forward_pass!(optimizer, ub)
+        # for i in 2:(length(optimizer.solve_order))
+        #     _optimize_in_forward_pass!(optimizer, i, ub)
+        # end
     end
 
     ############### if it is not a MIP, do the backward pass now ###################

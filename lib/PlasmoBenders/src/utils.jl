@@ -601,8 +601,9 @@ function _fix_variables(object::RemoteOptiGraph, variables::Vector{Plasmo.Remote
         lvars = [Plasmo._convert_proxy_to_local(lg, var) for var in pvars]
 
         PlasmoBenders._fix_variables(lg, lvars, values)
+        nothing
     end
-    return nothing
+    return fetch(f)
 end
 
 function _unfix_variables(object::OptiGraph, variables::Vector{Plasmo.NodeVariableRef})
@@ -617,6 +618,8 @@ function _unfix_variables(object::RemoteOptiGraph, variables::Vector{Plasmo.Remo
         lvars = [Plasmo._convert_proxy_to_local(lg, var) for var in pvars]
 
         PlasmoBenders._unfix_variables(lg, lvars)
+        nothing
     end
-    return nothing
+
+    return fetch(f)
 end

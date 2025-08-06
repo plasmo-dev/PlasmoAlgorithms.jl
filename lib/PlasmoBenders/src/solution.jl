@@ -132,7 +132,108 @@ function _update_objective_and_optimize(optimizer, next_object)
 
 end
 
-function _optimize_in_forward_pass!(optimizer, i, ub) #TODO: Type this function
+function _optimize_in_forward_pass_multithread!(optimizer::BendersAlgorithm{OptiGraph}, ub) #TODO: Type these functions
+    Threads.@threads for i in 2:(length(optimizer.solve_order))
+        _forward_pass_iteration!(optimizer, i, ub)
+    end
+end
+
+function _optimize_in_forward_pass_multithread!(optimizer::BendersAlgorithm{RemoteOptiGraph}, ub)
+    is_MIP = optimizer.is_MIP
+    feasibility_cuts = get_feasibility_cuts(optimizer)
+    regularize = get_regularize(optimizer)
+    @sync for i in 2:(length(optimizer.solve_order))
+        @async begin
+            next_object = optimizer.solve_order[i]
+
+            comp_vars = optimizer.comp_vars[next_object]
+            var_copy_map = optimizer.var_copy_map[next_object]
+            primal_iters = optimizer.primal_iters[next_object]
+            last_primals = primal_iters[:, size(primal_iters, 2)]
+            var_copies = [var_copy_map[var] for var in comp_vars]
+            pvar_copies = Plasmo._convert_remote_to_proxy(next_object, var_copies)
+            darray = next_object.graph
+            f = @spawnat next_object.worker begin
+                lgraph = Plasmo.local_graph(darray)
+                lvar_copies = Plasmo._convert_proxy_to_local(lgraph, pvar_copies)
+
+                JuMP.fix.(lvar_copies, last_primals, force = true)
+
+                optimize!(lgraph)
+
+                status = termination_status(lgraph)
+
+                if status == MOI.INFEASIBLE && feasibility_cuts
+                    is_feasible = false
+                    obj_val = JuMP.dual_objective_value(next_object)
+
+                    if !is_MIP
+                        duals = Float64[JuMP.dual(lgraph, FixRef(var)) for var in lvar_copies]
+                    else
+                        duals = nothing
+                    end
+                elseif status == MOI.OPTIMAL || status == MOI.LOCALLY_SOLVED
+
+                    is_feasible = true
+                    obj_val = JuMP.value(lgraph, JuMP.objective_function(lgraph))
+
+                    if !is_MIP
+                        duals = Float64[JuMP.dual(lgraph, FixRef(var)) for var in lvar_copies]
+                    else
+                        duals = nothing
+                    end
+                else
+                    error("Model on node $i terminated with status $status")
+                end
+
+                is_feasible, obj_val, duals
+            end
+
+            is_feasible, obj_val, duals = fetch(f)
+            if !is_feasible
+                ub[1] = Inf
+            else
+                ub[1] += obj_val
+            end
+
+            optimizer.feasibility_map[next_object] = is_feasible
+            if regularize
+                get_regularize_lbs(optimizer)[next_object] = obj_val
+                get_regularize_ubs(optimizer)[next_object] = obj_val
+            end
+            
+            if !(is_MIP)
+                dual_iters = optimizer.dual_iters[next_object]
+                optimizer.dual_iters[next_object] = hcat(dual_iters, duals)
+                push!(optimizer.phis[next_object], obj_val) 
+            end
+        end
+    end
+    # in sync loop
+    # start async block
+        # get comp_vars, varcopy stuff
+        # go to remote worker
+        # fix variables
+        # optimize! on remote worker
+        # check termination status
+        # query solutions
+        # unfix slacks
+        # pass back feasibility map, all forward_pass_solutions info, etc. 
+        # fetch results
+
+
+    # Threads.@threads for i in 2:(length(optimizer.solve_order))
+    #     _forward_pass_iteration!(optimizer, i, ub)
+    # end
+end
+
+function _optimize_in_forward_pass!(optimizer, ub) 
+    for i in 2:(length(optimizer.solve_order))
+        _forward_pass_iteration!(optimizer, i, ub)
+    end
+end
+
+function _forward_pass_iteration!(optimizer, i, ub)
     next_object = optimizer.solve_order[i]
 
     comp_vars = optimizer.comp_vars[next_object]
@@ -174,7 +275,7 @@ end
 
 function _save_forward_pass_solutions(optimizer, next_object, ub)
     # Add to the upper bound; if it's not the last object, subtract the cost-to-go from upper bound
-    obj_val = JuMP.value(next_object, JuMP.objective_function(next_object))
+    obj_val = JuMP.objective_value(next_object)
 
     next_objects = optimizer.solve_order_dict[next_object]
     if length(next_objects) > 0
@@ -546,7 +647,7 @@ function _add_to_upper_bound!(
     object::T, 
     ub
 ) where {T <: Plasmo.AbstractOptiGraph}
-    obj_val = JuMP.value(object, JuMP.objective_function(object))
+    obj_val = JuMP.objective_value(object)
     ub[1] += obj_val
     if length(optimizer.solve_order_dict[object]) > 0
         theta_val = _theta_value(optimizer, object)

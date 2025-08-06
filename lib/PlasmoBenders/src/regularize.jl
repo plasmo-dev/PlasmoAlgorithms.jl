@@ -102,7 +102,7 @@ function _regularize_pass!(
         end
     else
         _add_to_upper_bound!(optimizer, object, ub)
-        get_regularize_ubs(optimizer)[object] = value(object, objective_function(object))
+        get_regularize_ubs(optimizer)[object] = JuMP.objective_value(object)
 
         if !optimizer.is_MIP
             next_duals = _get_next_duals(optimizer, object)
