@@ -22,7 +22,6 @@ Attributes include
  - `parallelize_forward::Bool` - whether to parallelize the forward pass if possible
  - `parallelize_backward::Bool` - whether to parallelize the backward pass if possible
  - `add_slacks::Bool` - whether to add slack variables to linking constraints
- - `fix_slacks::Bool` - whether to fix the slack variables to zero; slacks will be relaxed
    if the problem is infeasible
  - `warm_start::Bool` - whether to warm start the problem using the previous best solution
  - `relaxed_init_cuts::Bool` - whether to create some initial cuts by relaxing the problem
@@ -40,7 +39,6 @@ mutable struct BendersOptions <: AbstractPBOptions
     parallelize_forward::Bool
     parallelize_backward::Bool
     add_slacks::Bool
-    fix_slacks::Bool
     warm_start::Bool
     relaxed_init_cuts::Bool
 
@@ -58,7 +56,6 @@ mutable struct BendersOptions <: AbstractPBOptions
         options.parallelize_forward = false
         options.parallelize_backward = false
         options.add_slacks = false
-        options.fix_slacks = false
         options.warm_start = true
         options.relaxed_init_cuts = false
 
@@ -285,7 +282,6 @@ OptiNode or subgraph on `graph`. key ward arguments include the following
  - `parallelize_backward = false` - whether to parallelize backward pass
  - `add_slacks::Bool = false` - whether to add slack variables to the linking constraints to
     help ensure feasibility between solutions; slack variables are penalized in objective
- - `fix_slacks = false` - whether to fix the slack variables to zero they only relax if a problem
    is infeasible
  - `warm_start::Bool = true` - whether to set the previous iterations solutions as the
     starting values for the next iterations forward pass
@@ -342,7 +338,6 @@ function BendersAlgorithm(
     parallelize_forward::Bool = false,
     parallelize_backward::Bool = false,
     add_slacks::Bool = false,
-    fix_slacks::Bool = false,
     warm_start::Bool = true,
     relaxed_init_cuts::Bool = false,
     slack_penalty = 1e6,
@@ -371,7 +366,6 @@ function BendersAlgorithm(
         set_parallelize_forward!(optimizer, parallelize_forward)
         set_parallelize_backward!(optimizer, parallelize_backward)
         set_add_slacks!(optimizer, add_slacks)
-        set_fix_slacks!(optimizer, fix_slacks)
         set_warm_start!(optimizer, warm_start)
         set_relaxed_init_cuts!(optimizer, relaxed_init_cuts)
 
@@ -399,10 +393,6 @@ function BendersAlgorithm(
         if !(get_multicut(optimizer)) && get_feasibility_cuts(optimizer)
             @warn("`multicut` cannot be false while `feasibility_cuts`` is true; setting `multicut` to true")
             set_multicut!(optimizer, true)
-        end
-
-        if isa(root_object, RemoteOptiGraph) && get_fix_slacks(optimizer)
-            error("`fix_slacks = true` is not currently supported for RemoteOptiGraphs")
         end
 
         # Set initial data
@@ -455,19 +445,6 @@ function BendersAlgorithm(
         # Check to make sure all objects have been added to the solve_order vector
         if length(intersect(_get_objects(optimizer), optimizer.solve_order)) != length(_get_objects(optimizer))
             error("Number of nodes/graphs being solved does not match the number of nodes/graphs in the overall graph")
-        end
-
-        if get_add_slacks(optimizer) && get_fix_slacks(optimizer)
-            slack_vars = optimizer.slack_vars
-            for i in 2:length(optimizer.solve_order)
-                object = optimizer.solve_order[i]
-
-                slacks = slack_vars[object]
-
-                for var in slacks
-                    JuMP.fix(var, 0, force = true)
-                end
-            end
         end
 
         var_solution_map = optimizer.var_solution_map
@@ -678,28 +655,12 @@ function _forward_pass!(optimizer::BendersAlgorithm)
     ########## Solve the first node ############
     root_object = optimizer.solve_order[1]
 
-    # acs = all_constraints(root_object, include_variable_in_set_constraints = false)
-    # if optimizer.current_iter >= 6
-    #     offset = optimizer.current_iter - 6
-    #     set_normalized_rhs(acs[77 + offset], -1e9)
-    # end
-
     JuMP.optimize!(root_object)
 
-    root_object_feasibility = _check_termination_status(optimizer, root_object, 1)
-
-    # acs = all_constraints(root_object, include_variable_in_set_constraints = false)
-    # lhs = [value(root_object, constraint_object(c).func) for c in acs[77:length(acs)]]
-    # rhs = [constraint_object(c).set.lower for c in acs[77:length(acs)]]
-    # comp_vals = [(lhs[i], rhs[i]) for i in 1:length(rhs)]
-    # condition = x -> abs(x[1] - x[2]) < 1e-4
-    # active_set_idxs = findall(condition, comp_vals)
-    # println("active constraint refs: ", active_set_idxs, " out of $(length(acs)-76) constraints")
+    root_object_feasibility = _check_termination_status(root_object, 1; add_slacks_bool=get_add_slacks(optimizer), feasibility_cuts_bool=get_feasibility_cuts(optimizer))
 
     # Get initial objective
     root_objective = JuMP.objective_value(root_object)
-    #sols = [value(root_object, var) for var in all_variables(root_object)]
-    #optimizer.ext["root_sols"] = hcat(optimizer.ext["root_sols"], sols)
 
     # Initialize upper bound
     ub = [0.]
@@ -731,17 +692,8 @@ function _forward_pass!(optimizer::BendersAlgorithm)
     if get_parallelize_benders(optimizer)
 
         _optimize_in_forward_pass_multithread!(optimizer, ub)
-        #Threads.@threads for i in 2:(length(optimizer.solve_order))
-        #    _optimize_in_forward_pass!(optimizer, i, ub)
-        #end
-        # @sync for i in 2:(length(optimizer.solve_order))
-        #     @async _optimize_in_forward_pass!(optimizer, i, ub)
-        # end
     else
         _optimize_in_forward_pass!(optimizer, ub)
-        # for i in 2:(length(optimizer.solve_order))
-        #     _optimize_in_forward_pass!(optimizer, i, ub)
-        # end
     end
 
     ############### if it is not a MIP, do the backward pass now ###################
@@ -770,10 +722,6 @@ function _backward_pass!(optimizer::BendersAlgorithm; strengthened::Bool = false
         Threads.@threads for i in 1:len_solve_order
             _optimize_in_backward_pass(optimizer, i)
         end
-
-        # @sync for i in 1:len_solve_order
-        #     @async _optimize_in_backward_pass(optimizer, i)
-        # end
     else
         for i in 1:len_solve_order
             _optimize_in_backward_pass(optimizer, i)

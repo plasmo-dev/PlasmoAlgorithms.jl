@@ -142,6 +142,7 @@ function _optimize_in_forward_pass_multithread!(optimizer::BendersAlgorithm{Remo
     is_MIP = optimizer.is_MIP
     feasibility_cuts = get_feasibility_cuts(optimizer)
     regularize = get_regularize(optimizer)
+    add_slacks = get_add_slacks(optimizer)
     @sync for i in 2:(length(optimizer.solve_order))
         @async begin
             next_object = optimizer.solve_order[i]
@@ -161,10 +162,9 @@ function _optimize_in_forward_pass_multithread!(optimizer::BendersAlgorithm{Remo
 
                 optimize!(lgraph)
 
-                status = termination_status(lgraph)
+                is_feasible = _check_termination_status(lgraph, i; add_slacks_bool=add_slacks, feasibility_cuts_bool=feasibility_cuts)
 
-                if status == MOI.INFEASIBLE && feasibility_cuts
-                    is_feasible = false
+                if feasibility_cuts && !(is_feasible)
                     obj_val = JuMP.dual_objective_value(next_object)
 
                     if !is_MIP
@@ -172,9 +172,7 @@ function _optimize_in_forward_pass_multithread!(optimizer::BendersAlgorithm{Remo
                     else
                         duals = nothing
                     end
-                elseif status == MOI.OPTIMAL || status == MOI.LOCALLY_SOLVED
-
-                    is_feasible = true
+                elseif is_feasible
                     obj_val = JuMP.value(lgraph, JuMP.objective_function(lgraph))
 
                     if !is_MIP
@@ -183,7 +181,7 @@ function _optimize_in_forward_pass_multithread!(optimizer::BendersAlgorithm{Remo
                         duals = nothing
                     end
                 else
-                    error("Model on node $i terminated with status $status")
+                    error("Model on graph $i terminated with status $(termination_status(lgraph))")
                 end
 
                 is_feasible, obj_val, duals
@@ -209,22 +207,6 @@ function _optimize_in_forward_pass_multithread!(optimizer::BendersAlgorithm{Remo
             end
         end
     end
-    # in sync loop
-    # start async block
-        # get comp_vars, varcopy stuff
-        # go to remote worker
-        # fix variables
-        # optimize! on remote worker
-        # check termination status
-        # query solutions
-        # unfix slacks
-        # pass back feasibility map, all forward_pass_solutions info, etc. 
-        # fetch results
-
-
-    # Threads.@threads for i in 2:(length(optimizer.solve_order))
-    #     _forward_pass_iteration!(optimizer, i, ub)
-    # end
 end
 
 function _optimize_in_forward_pass!(optimizer, ub) 
@@ -244,15 +226,12 @@ function _forward_pass_iteration!(optimizer, i, ub)
     # Fix primal solutions
     var_copies = [var_copy_map[var] for var in comp_vars]
     PlasmoBenders._fix_variables(next_object, var_copies, last_primals)
-    #for (j, var) in enumerate(comp_vars)
-    #    JuMP.fix(var_copy_map[var], last_primals[j], force = true)
-    #end
 
     # Optimize the next node
     optimize!(next_object)
 
     # Check termination status
-    object_termination_status = _check_termination_status(optimizer, next_object, i)
+    object_termination_status = _check_termination_status(next_object, i; add_slacks_bool=get_add_slacks(optimizer), feasibility_cuts_bool=get_feasibility_cuts(optimizer))
 
     if object_termination_status
         _save_forward_pass_solutions(optimizer, next_object, ub)
@@ -265,12 +244,7 @@ function _forward_pass_iteration!(optimizer, i, ub)
         optimizer.feasibility_map[next_object] = false
     end
 
-    _check_fixed_slacks!(optimizer, next_object)
-
     PlasmoBenders._unfix_variables(next_object, var_copies)
-    #for (j, var) in enumerate(comp_vars)
-    #    JuMP.unfix(var_copy_map[var])
-    #end
 end
 
 function _save_forward_pass_solutions(optimizer, next_object, ub)
@@ -367,16 +341,13 @@ function _optimize_in_backward_pass(optimizer, i)
         # Fix primal solutions
         var_copies = [var_copy_map[var] for var in comp_vars]
         PlasmoBenders._fix_variables(object, var_copies, last_primals)
-        #for (j, var) in enumerate(comp_vars)
-        #    JuMP.fix(var_copy_map[var], last_primals[j], force = true)
-        #end
     end
 
     # Optimize the next node
     optimize!(object)
 
     # Check termination status
-    object_termination_status = _check_termination_status(optimizer, object, i)
+    object_termination_status = _check_termination_status(object, i; add_slacks_bool=get_add_slacks(optimizer), feasibility_cuts_bool=get_feasibility_cuts(optimizer))
 
     # If it's not the first node, save the dual and phi values
     if i != 1
@@ -400,12 +371,7 @@ function _optimize_in_backward_pass(optimizer, i)
 
         # Unfix primal solutions
         PlasmoBenders._unfix_variables(object, var_copies)
-        #for (j, var) in enumerate(comp_vars)
-        #    JuMP.unfix(var_copy_map[var])
-        #end
     end
-
-    _check_fixed_slacks!(optimizer, object)
 
     # Reset binary/integer variables
     bin_vars_with_lower_bound = JuMP.has_lower_bound.(bin_vars)

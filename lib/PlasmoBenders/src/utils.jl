@@ -301,6 +301,8 @@ function _set_is_MIP(optimizer::BendersAlgorithm{Plasmo.RemoteOptiGraph})
     graph = optimizer.graph
 
     subgraphs = graph.subgraphs
+    root_object = optimizer.root_object
+    subgraphs = setdiff(subgraphs, [root_object])
     for g in subgraphs
         if PlasmoBenders._check_is_MIP(g)
             optimizer.is_MIP = true
@@ -330,38 +332,21 @@ function _get_objects(graph::T) where {T <: Plasmo.AbstractOptiGraph}
     return local_subgraphs(graph)
 end
 
-function _check_termination_status(optimizer::BendersAlgorithm, object, count)
+function _check_termination_status(object, count; add_slacks_bool::Bool=false, feasibility_cuts_bool::Bool=false)
     if termination_status(object) == MOI.INFEASIBLE
-        if get_add_slacks(optimizer)
-            if haskey(optimizer.slack_vars, object)
-                slack_vars = optimizer.slack_vars[object]
-                if !(get_fix_slacks(optimizer))
-                    error("Model on node/graph $count is infeasible; `add_slacks` is true, but the model is still infeasible!")
-                else
-                    for var in slack_vars
-                        JuMP.unfix(var)
-                        JuMP.set_lower_bound(var, 0)
-                    end
-                    @warn("Model on node/graph $count is infeasible; unfixing slack variables")
-
-                    optimize!(object)
-
-                    if termination_status(object) != MOI.OPTIMAL
-                        error("Model on node/graph $count still did not reach optimal solution; status = $(termination_status(object))")
-                    end
-                end
-            else
-                error("Model on node/graph $count is infeasible; `add_slacks` is true, but there are not slacks to unfix!")
-            end
-        elseif get_feasibility_cuts(optimizer) && count != 1
+        if add_slacks_bool
+            error("Model on graph $count is infeasible even though `add_slacks` is true. This should not happen. Check problem data or open an issue for PlasmoBenders")
+        elseif feasibility_cuts_bool && count != 1
             return false
         else
-            error("Model on node/graph $count is infeasible")
+            error("Model on graph $count is infeasible")
         end
     elseif termination_status(object) == MOI.INFEASIBLE_OR_UNBOUNDED
-        error("Model on node/graph $count is unbounded or infeasible")
-    elseif (termination_status(object) != MOI.OPTIMAL) && (termination_status(object) != MOI.LOCALLY_SOLVED) && (termination_status(object) != MOI.TIME_LIMIT)
-        error("Model on node/graph $count terminated with status $(termination_status(object))")
+        error("Model on graph $count is unbounded or infeasible")
+    elseif termination_status(object) == MOI.TIME_LIMIT
+        @warn "Model on graph $count timed out"
+    elseif (termination_status(object) != MOI.OPTIMAL) && (termination_status(object) != MOI.LOCALLY_SOLVED)
+        error("Model on graph $count terminated with status $(termination_status(object))")
     end
     return true
 end
@@ -380,21 +365,6 @@ function JuMP.objective_value(optimizer::BendersAlgorithm, object, last_obj::Boo
         end
     else
         return JuMP.objective_value(object)
-    end
-end
-
-function _check_fixed_slacks!(optimizer::BendersAlgorithm, object)
-    if get_add_slacks(optimizer)
-        if get_fix_slacks(optimizer)
-            slack_vars = optimizer.slack_vars
-            if haskey(slack_vars, object)
-                if !(JuMP.is_fixed(slack_vars[object][1]))
-                    for var in slack_vars[object]
-                        JuMP.fix(var, 0, force = true)
-                    end
-                end
-            end
-        end
     end
 end
 
@@ -428,7 +398,6 @@ _options_bool_fields = [
     :parallelize_forward,
     :parallelize_backward,
     :add_slacks,
-    :fix_slacks,
     :warm_start,
     :relaxed_init_cuts
 ]
