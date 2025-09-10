@@ -9,6 +9,7 @@ function _add_constraint_set_to_subproblem!(
     slack::Bool
 ) where {V <: JuMP.AbstractVariableRef, T <: Plasmo.AbstractOptiGraph, N <: Union{Plasmo.OptiNode, Plasmo.RemoteNodeRef}}
     if get_add_slacks(optimizer)
+        slack_penalty = get_slack_penalty(optimizer)
         _add_slack_to_node(optimizer, next_object, node, length(cons), slack_penalty)
         for (j, con) in enumerate(cons)
             con_obj = JuMP.constraint_object(con)
@@ -21,11 +22,11 @@ function _add_constraint_set_to_subproblem!(
     else
         for (j, con) in enumerate(cons)
             con_obj = JuMP.constraint_object(con)
-                _add_constraint_to_subproblem!(con_obj, comp_vars, var_copy_map,
-                                              next_object, node, link; slack = slack,
-                                              slack_up = nothing,
-                                              slack_down = nothing
-                )
+            _add_constraint_to_subproblem!(con_obj, comp_vars, var_copy_map,
+                                          next_object, node, link; slack = slack,
+                                          slack_up = nothing,
+                                          slack_down = nothing
+            )
         end
     end
     return nothing
@@ -103,21 +104,21 @@ end
 #     end
 #     return nothing
 # end
-
-function _get_function_constant(con::ScalarConstraint)
-    if isa(con.set, MOI.GreaterThan)
-        return con.set.lower
-    elseif isa(con.set, MOI.LessThan)
-        return con.set.upper
-    elseif isa(con.set, MOI.EqualTo)
-        return con.set.value
-    else 
-        error("Constraint is of type $(typeof(con.set)) which is not implemented")
-    end
-end
+# 
+# function _get_function_constant(con::ScalarConstraint)
+#     if isa(con.set, MOI.GreaterThan)
+#         return con.set.lower
+#     elseif isa(con.set, MOI.LessThan)
+#         return con.set.upper
+#     elseif isa(con.set, MOI.EqualTo)
+#         return con.set.value
+#     else 
+#         error("Constraint is of type $(typeof(con.set)) which is not implemented")
+#     end
+# end
 
 function _add_constraint_to_subproblem!(
-    con_obj::ScalarConstraint{GenericAffExpr{Float64, V}, MOI.LessThan{Float64}},#ConstraintRef{Plasmo.OptiEdge{Plasmo.OptiGraph}, MOI.ConstraintIndex{MOI.ScalarAffineFunction{Float64}, MOI.LessThan{Float64}}},
+    con_obj::ScalarConstraint{GenericAffExpr{Float64, V}, MOI.LessThan{Float64}},
     comp_vars,
     var_copy_map,
     next_object::T,
@@ -155,7 +156,7 @@ function _add_constraint_to_subproblem!(
 end
 
 function _add_constraint_to_subproblem!(
-    con_obj::ScalarConstraint{GenericAffExpr{Float64, V}, MOI.EqualTo{Float64}},#ConstraintRef{Plasmo.OptiEdge{Plasmo.OptiGraph}, MOI.ConstraintIndex{MOI.ScalarAffineFunction{Float64}, MOI.EqualTo{Float64}}},
+    con_obj::ScalarConstraint{GenericAffExpr{Float64, V}, MOI.EqualTo{Float64}},
     comp_vars,
     var_copy_map,
     next_object::T,
@@ -193,7 +194,7 @@ function _add_constraint_to_subproblem!(
 end
 
 function _add_constraint_to_subproblem!(
-    con_obj::ScalarConstraint{GenericAffExpr{Float64, V}, MOI.GreaterThan{Float64}},#ConstraintRef{Plasmo.OptiEdge{Plasmo.OptiGraph}, MOI.ConstraintIndex{MOI.ScalarAffineFunction{Float64}, MOI.GreaterThan{Float64}}},
+    con_obj::ScalarConstraint{GenericAffExpr{Float64, V}, MOI.GreaterThan{Float64}},
     comp_vars,
     var_copy_map,
     next_object::T,
@@ -232,7 +233,7 @@ end
 
 ################ QUADRATICS: 
 function _add_constraint_to_subproblem!(
-    con_obj::ScalarConstraint{GenericQuadExpr{Float64, V}, MOI.LessThan{Float64}},#ConstraintRef{Plasmo.OptiEdge{Plasmo.OptiGraph}, MOI.ConstraintIndex{MOI.ScalarAffineFunction{Float64}, MOI.LessThan{Float64}}},
+    con_obj::ScalarConstraint{GenericQuadExpr{Float64, V}, MOI.LessThan{Float64}},
     comp_vars,
     var_copy_map,
     next_object::T,
@@ -280,7 +281,7 @@ function _add_constraint_to_subproblem!(
 end
 
 function _add_constraint_to_subproblem!(
-    con_obj::ScalarConstraint{GenericQuadExpr{Float64, V}, MOI.EqualTo{Float64}},#ConstraintRef{Plasmo.OptiEdge{Plasmo.OptiGraph}, MOI.ConstraintIndex{MOI.ScalarAffineFunction{Float64}, MOI.EqualTo{Float64}}},
+    con_obj::ScalarConstraint{GenericQuadExpr{Float64, V}, MOI.EqualTo{Float64}},
     comp_vars,
     var_copy_map,
     next_object::T,
@@ -328,7 +329,7 @@ function _add_constraint_to_subproblem!(
 end
 
 function _add_constraint_to_subproblem!(
-    con_obj::ScalarConstraint{GenericQuadExpr{Float64, V}, MOI.GreaterThan{Float64}},#ConstraintRef{Plasmo.OptiEdge{Plasmo.OptiGraph}, MOI.ConstraintIndex{MOI.ScalarAffineFunction{Float64}, MOI.GreaterThan{Float64}}},
+    con_obj::ScalarConstraint{GenericQuadExpr{Float64, V}, MOI.GreaterThan{Float64}},
     comp_vars,
     var_copy_map,
     next_object::T,
@@ -377,8 +378,6 @@ end
 
 
 ########## END QUADRATICS
-
-
 
 
 # Define function to add theta to the objective

@@ -190,7 +190,7 @@ end
 
 function _warm_start(optimizer::BendersAlgorithm{Plasmo.RemoteOptiGraph}, object::Plasmo.RemoteOptiGraph)
     all_vals = optimizer.best_solutions[object]
-    darray = rgraph.graph
+    darray = optimizer.graph.graph
 
     f = @spawnat object.worker begin
         lg = Plasmo.local_graph(darray)

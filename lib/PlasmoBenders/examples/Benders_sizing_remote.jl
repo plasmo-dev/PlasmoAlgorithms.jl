@@ -1,5 +1,3 @@
-a = 1
-
 using Revise
 using Random, Distributions, Distributed
 t = 0:1:30
@@ -7,7 +5,6 @@ t = 0:1:30
 Random.seed!(10)
 cost1 = sin.(t .* 2 .* pi ./ 10 ) .* 2 .+ 10 .+ rand(Uniform(-1,1),31) .* .5
 demand1 = sin.(t .* 2 .* pi ./ 15 ) .* 30 .+ 100 .+ rand(Uniform(-1,1),31) .* 5
-
 
 using Plasmo, HiGHS, PlasmoBenders
 
@@ -111,74 +108,3 @@ solver = optimizer_with_attributes(HiGHS.Optimizer, "output_flag" => false)
 benders_alg = BendersAlgorithm(g, g_root, solver = solver)
 
 run_algorithm!(benders_alg)
-
-# og = OptiGraph()
-# og1 = OptiGraph()
-# add_subgraph(og, og1)
-# @optinode(og1, ons[1:2])
-# @optinode(og1, _tn)
-# num_ts = 2
-# @variable(og1[:_tn], _t[1:10, 1:10, 1:10] >= 0)
-
-# @optinode(last_object, _theta_node)
-# @variable(last_object[:_theta_node], _theta[1:num_thetas] >= 0)
-
-# # Add theta to the node's objective
-# theta_sum = sum(_theta[i] for i in 1:num_thetas)
-# @objective(last_object[:_theta_node], Min, theta_sum)
-
-# # If the initial relaxation is not being solved, set lower bound as M
-# if !relaxed || !(optimizer.is_MIP)
-#     for i in 1:num_thetas
-#         JuMP.set_lower_bound(last_object[:_theta_node][:_theta][i], optimizer.M)
-#     end
-# end
-
-
-
-
-
-
-#=
-xyz = Dict()
-xyz[g1_nodes[1]] = 1
-
-g1_nodes_copy = all_nodes(g1)
-
-xyz[g1_nodes_copy[1]];
-
-g1_nodes[1] == g1_nodes_copy[1]
-
-g1_nodes[1].remote_graph == g1_nodes_copy[1].remote_graph
-g1_nodes[1].node_idx == g1_nodes_copy[1].node_idx
-g1_nodes[1].node_label == g1_nodes_copy[1].node_label
-
-
-a1 = xy(g, 1, 2)
-a2 = xy(g, 1, 2)
-
-a1 == a2
-
-f1 = @spawnat 2 :n1
-f2 = @spawnat 2 :n1
-
-i1 = fetch(f1)
-i2 = fetch(f2)
-
-i1 == i2
-
-n1 = RemoteNodeRef(g, Plasmo.NodeIndex(Symbol("##226")), Symbol[i1])
-n2 = RemoteNodeRef(g, Plasmo.NodeIndex(Symbol("##226")), Symbol[i2])
-
-n1 == n2
-
-
-rg = RemoteOptiGraph()
-struct d3
-    a::RemoteOptiGraph
-    b::Vector{Symbol}
-end
-
-d3(rg, Symbol[i1]) == d3(rg, Symbol[i2])
-
-Symbol[i1] == Symbol[i2]=#

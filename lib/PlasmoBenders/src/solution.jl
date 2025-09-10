@@ -128,8 +128,8 @@ function _update_objective_and_optimize(optimizer, next_object)
     end
 
     JuMP.set_objective_function(next_object, next_object_objective_function)
-    #@objective(next_object, Min, next_object_objective_function)
 
+    return nothing
 end
 
 function _optimize_in_forward_pass_multithread!(optimizer::BendersAlgorithm{OptiGraph}, ub) #TODO: Type these functions
