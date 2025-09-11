@@ -379,29 +379,6 @@ end
 
 ########## END QUADRATICS
 
-
-# Define function to add theta to the objective
-function _add_theta_to_objective!(
-    obj_func::AffExpr,
-    node::N,
-    _theta::Vector{V}
-) where {V <: JuMP.AbstractVariableRef, N <: Union{Plasmo.OptiNode, Plasmo.RemoteNodeRef}}
-    for i in 1:length(_theta)
-        add_to_expression!(obj_func, _theta[i] * 1)
-    end
-    JuMP.set_objective_function(node, obj_func)
-
-end
-
-function _add_theta_to_objective!(
-    obj_func::V,
-    node::N,
-    _theta::Vector{V}
-) where {V <: JuMP.AbstractVariableRef, N <: Union{Plasmo.OptiNode, Plasmo.RemoteNodeRef}}
-    obj_func = obj_func + sum(_theta[i] for i in 1:length(_theta))
-    JuMP.set_objective_function(node, obj_func)
-end
-
 function _set_theta_lower_bound!(object::T, M) where {T <: Plasmo.AbstractOptiGraph}
     theta = object[:_theta_node][:_theta]
     for i in 1:length(theta)
@@ -452,4 +429,37 @@ function _get_con_obj_var_sets(con_obj::ScalarConstraint{GenericQuadExpr{Float64
     last_object_link_vars = [var for var in vars if JuMP.owner_model(var) in last_object_nodes]
 
     return vars, next_object_link_vars, last_object_link_vars
+end
+
+function _add_to_objective_function(object::OptiGraph, theta_sum::E) where {E<:Union{NodeVariableRef, GenericAffExpr}}
+    obj_func = objective_function(object)
+    if isa(obj_func, NodeVariableRef)
+        new_obj_func = GenericAffExpr{Float64, NodeVariableRef}()
+        add_to_expression!(new_obj_func, obj_func + theta_sum)
+        set_objective_function(lgraph, new_obj_func)
+    else
+        add_to_expression!(obj_func, theta_sum)
+        set_objective_function(object, obj_func)
+    end
+end
+
+function _add_to_objective_function(object::RemoteOptiGraph, theta_sum::E) where {E<:Union{RemoteVariableRef, GenericAffExpr}}
+    darray = object.graph
+    pexpr = Plasmo._convert_remote_to_proxy(object, theta_sum)
+
+    f = @spawnat object.worker begin
+        lgraph = Plasmo.local_graph(darray)
+        lexpr = Plasmo._convert_proxy_to_local(lgraph, pexpr)
+        obj_func = objective_function(lgraph)
+        if isa(obj_func, NodeVariableRef)
+            new_obj_func = GenericAffExpr{Float64, NodeVariableRef}()
+            add_to_expression!(new_obj_func, obj_func + lexpr)
+            set_objective_function(lgraph, new_obj_func)
+        else
+            add_to_expression!(obj_func, lexpr)
+            set_objective_function(lgraph, obj_func)
+        end
+        nothing
+    end
+    return fetch(f)
 end

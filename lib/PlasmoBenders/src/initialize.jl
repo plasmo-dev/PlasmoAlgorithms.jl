@@ -89,6 +89,7 @@ function _add_cost_to_go!(
     theta_sum = sum(_theta[i] for i in 1:num_thetas)
     @objective(last_object[:_theta_node], Min, theta_sum)
 
+    _add_to_objective_function(last_object, theta_sum)
     # If the initial relaxation is not being solved, set lower bound as M
     if !relaxed || !(optimizer.is_MIP)
         for i in 1:num_thetas
@@ -332,6 +333,8 @@ function _add_next_object!(
 
     ############# Add Cost-to-Go Variable #################
     # Add cost-to-go variable and add to objective function
+    _add_cost_to_go!(optimizer, next_object, relaxed)
+
     for g in next_graphs
         if g in optimizer.solve_order
             error("The subproblems do not form a tree")

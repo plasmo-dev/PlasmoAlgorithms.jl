@@ -105,8 +105,6 @@ function test_DDP_MIP_initialization()
     @test get_parallelize_backward(DDPOpt) == true
     set_add_slacks!(DDPOpt, true)
     @test get_add_slacks(DDPOpt) == true
-    set_fix_slacks!(DDPOpt, true)
-    @test get_fix_slacks(DDPOpt) == true
     set_warm_start!(DDPOpt, false)
     @test get_warm_start(DDPOpt) == false
     set_relaxed_init_cuts!(DDPOpt, true)

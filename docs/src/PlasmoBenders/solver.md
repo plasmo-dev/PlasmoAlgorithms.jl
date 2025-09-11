@@ -10,7 +10,6 @@ PlasmoBenders supports several different solver options. These are keyword argum
  * `parallelize_backward::Bool` - Whether to parallelize the backwards pass.
  * `add_slacks::Bool` - Whether to add slack variables to the linking constraint that is enforced on the downstream problem. This helps ensure recourse to the subproblems.
  * `slack_penalty::Real` - THe value of the penalty term used on the slack variables added to the linking constraints. 
- * `fix_slacks::Bool` - An experimental option where slack variables are fixed until a problem is infeasible, in which case, the slack variables are allowed to be unfixed to make the problem feasible. THere are no convergence guarantees on this approach.
  * `warm_start::Bool` - Whether to warm start the problems with the best solution that the solver has found so far. Cannot be true if `regularize=true`. 
  * `relaxed_init_cuts::Bool` - Whether to add initial cuts from a full problem relaxation. For MILP problems, initial cuts can be added by relaxing all integer variables and solving the full problem, and using the resulting primal/dual information to form cutting planes. See [Lara](https://www.sciencedirect.com/science/article/pii/S0377221718304466).
  * `max_iters::Int` - The maximum number of iterations to use before termination.

@@ -316,6 +316,9 @@ function BendersAlgorithm(
     node_partition = Partition(graph, node_membership_vector)
 
     apply_partition!(graph, node_partition)
+    for g in local_subgraphs(graph)
+        set_to_node_objectives(g)
+    end
     start_graph = local_subgraphs(graph)[1]
 
     return BendersAlgorithm(graph, start_graph; solver = solver, args...)
@@ -341,7 +344,8 @@ function BendersAlgorithm(
     warm_start::Bool = true,
     relaxed_init_cuts::Bool = false,
     slack_penalty = 1e6,
-    regularize_param::Real = 0.5
+    regularize_param::Real = 0.5,
+    set_graph_objectives_from_nodes = false
 ) where {T <: Plasmo.AbstractOptiGraph}
 
     if !(root_object in local_subgraphs(graph))
@@ -352,6 +356,11 @@ function BendersAlgorithm(
     flush(stdout)
 
     time_init = @elapsed begin
+        if set_graph_objectives_from_nodes
+            for g in local_subgraphs(graph)
+                set_to_node_objectives(g)
+            end
+        end
 
         # Initiailize optimizer and graph
         V = Plasmo.variable_type(graph)
@@ -484,17 +493,12 @@ function BendersAlgorithm(
             optimizer.last_solutions[object] = zeros(Float64, length(all_vars))
         end
 
-        Plasmo.set_to_node_objectives(optimizer.graph)
         if get_relaxed_init_cuts(optimizer) && optimizer.is_MIP
             _add_initial_relaxed_cuts!(optimizer)
         end
 
         #Plasmo._init_graph_backend(optimizer.graph)
 
-        for i in 1:length(optimizer.solve_order)
-            Plasmo.set_to_node_objectives(optimizer.solve_order[i])
-        end
-        Plasmo.set_to_node_objectives(optimizer.graph)
         # Construct regularization abilities if needed
         if get_regularize(optimizer)
             _construct_regularize!(optimizer)
@@ -690,7 +694,6 @@ function _forward_pass!(optimizer::BendersAlgorithm)
 
     ############# Solve each successive object #################
     if get_parallelize_benders(optimizer)
-
         _optimize_in_forward_pass_multithread!(optimizer, ub)
     else
         _optimize_in_forward_pass!(optimizer, ub)
