@@ -166,6 +166,7 @@ function _optimize_in_forward_pass_multithread!(optimizer::BendersAlgorithm{Remo
 
                 if feasibility_cuts && !(is_feasible)
                     obj_val = JuMP.dual_objective_value(next_object)
+                    println("Subgraph $i in forward pass was infeasible; using feasibility_cuts")
 
                     if !is_MIP
                         duals = Float64[JuMP.dual(lgraph, FixRef(var)) for var in lvar_copies]
@@ -268,7 +269,7 @@ function _save_forward_pass_solutions(optimizer, next_object, ub)
         next_objects = optimizer.solve_order_dict[next_object]
         for object in next_objects
             next_comp_vars = optimizer.comp_vars[object]
-            last_primals = _get_variable_values(next_object, next_comp_vars)#[JuMP.value(next_object, var) for var in next_comp_vars]
+            last_primals = _get_variable_values(next_object, next_comp_vars)
 
             primal_iters = optimizer.primal_iters[object]
             optimizer.primal_iters[object] = hcat(primal_iters, last_primals)

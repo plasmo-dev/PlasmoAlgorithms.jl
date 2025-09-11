@@ -223,9 +223,9 @@ function _add_slack_to_node(optimizer::BendersAlgorithm, next_object, node::N, n
 
     # Ensure the objective is an Affine Expression
     if isa(obj_func, V)
-        obj_func = GenericAffExpr{Float64, N}(0, obj_func => 1)
+        obj_func = GenericAffExpr{Float64, V}(0, obj_func => 1)
     elseif typeof(obj_func) == nothing
-        obj_func = GenericAffExpr{Float64, N}()
+        obj_func = GenericAffExpr{Float64, V}()
     end
 
     # Add the slacks to the objective function

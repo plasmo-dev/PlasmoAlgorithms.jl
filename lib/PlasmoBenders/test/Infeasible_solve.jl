@@ -56,9 +56,9 @@ function build_remote_graph(MILP = false)
     return rg
 end
 
-function get_gap(DDPOpt::BendersAlgorithm)
-    ub = DDPOpt.best_upper_bound
-    lb = DDPOpt.lower_bounds[end]
+function get_gap(BendersAlg::BendersAlgorithm)
+    ub = BendersAlg.best_upper_bound
+    lb = BendersAlg.lower_bounds[end]
 
     gap = (ub - lb) / (abs(lb))
 
@@ -69,28 +69,28 @@ function test_graphs()
     solver = optimizer_with_attributes(HiGHS.Optimizer, "output_flag" => false)
 
     gtest = build_graph()
-    DDPOpt = BendersAlgorithm(gtest, gtest[:nodes][1], max_iters = 20, feasibility_cuts = true, solver = solver);
-    run_algorithm!(DDPOpt)
-    @test isapprox(DDPOpt.best_upper_bound, 2.0, rtol = 1e-6)
-    @test DDPOpt.status == MOI.OPTIMAL
+    BendersAlg = BendersAlgorithm(gtest, gtest[:nodes][1], max_iters = 20, feasibility_cuts = true, solver = solver);
+    run_algorithm!(BendersAlg)
+    @test isapprox(BendersAlg.best_upper_bound, 2.0, rtol = 1e-6)
+    @test BendersAlg.status == MOI.OPTIMAL
 
     gtest = build_graph(true)
-    DDPOpt = BendersAlgorithm(gtest, gtest[:nodes][1], max_iters = 20, feasibility_cuts = true, solver = solver);
-    run_algorithm!(DDPOpt)
-    @test isapprox(DDPOpt.best_upper_bound, 2.0, rtol = 1e-6)
-    @test DDPOpt.status == MOI.OPTIMAL
+    BendersAlg = BendersAlgorithm(gtest, gtest[:nodes][1], max_iters = 20, feasibility_cuts = true, solver = solver);
+    run_algorithm!(BendersAlg)
+    @test isapprox(BendersAlg.best_upper_bound, 2.0, rtol = 1e-6)
+    @test BendersAlg.status == MOI.OPTIMAL
     
     gtest = build_remote_graph(false)
-    DDPOpt = BendersAlgorithm(gtest, local_subgraphs(gtest)[1], max_iters = 20, feasibility_cuts = true, solver = solver);
-    run_algorithm!(DDPOpt)
-    @test isapprox(DDPOpt.best_upper_bound, 2.0, rtol = 1e-6)
-    @test DDPOpt.status == MOI.OPTIMAL
+    BendersAlg = BendersAlgorithm(gtest, local_subgraphs(gtest)[1], max_iters = 20, feasibility_cuts = true, solver = solver);
+    run_algorithm!(BendersAlg)
+    @test isapprox(BendersAlg.best_upper_bound, 2.0, rtol = 1e-6)
+    @test BendersAlg.status == MOI.OPTIMAL
 
     gtest = build_remote_graph(true)
-    DDPOpt = BendersAlgorithm(gtest, local_subgraphs(gtest)[1], max_iters = 20, feasibility_cuts = true, solver = solver);
-    run_algorithm!(DDPOpt)
-    @test isapprox(DDPOpt.best_upper_bound, 2.0, rtol = 1e-6)
-    @test DDPOpt.status == MOI.OPTIMAL
+    BendersAlg = BendersAlgorithm(gtest, local_subgraphs(gtest)[1], max_iters = 20, feasibility_cuts = true, solver = solver);
+    run_algorithm!(BendersAlg)
+    @test isapprox(BendersAlg.best_upper_bound, 2.0, rtol = 1e-6)
+    @test BendersAlg.status == MOI.OPTIMAL
 end
 
 function run_tests()

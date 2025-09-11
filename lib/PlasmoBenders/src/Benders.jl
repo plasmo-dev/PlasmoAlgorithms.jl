@@ -361,6 +361,11 @@ function BendersAlgorithm(
                 set_to_node_objectives(g)
             end
         end
+        for (i, g) in enumerate(local_subgraphs(graph))
+            if objective_sense(g) != MOI.MIN_SENSE
+                error("Objective sense of subgraph $i is $(objective_sense(g)). All graphs must use MIN_SENSE for algorithm")
+            end
+        end
 
         # Initiailize optimizer and graph
         V = Plasmo.variable_type(graph)
