@@ -132,6 +132,8 @@ function test_DDP_MIP_initialization()
     @test get_time_forward_pass(BendersAlg) == 0
     @test get_time_backward_pass(BendersAlg) == 0
     @test get_time_init(BendersAlg) > 0
+    @test get_time_root_problem_solve(BendersAlg) == 0
+    @test get_time_subproblem_solves(BendersAlg) == 0
     @test typeof(get_time_iterations(BendersAlg)) <: Vector
     @test typeof(get_lower_bounds(BendersAlg)) <: Vector
     @test typeof(get_upper_bounds(BendersAlg, monotonic = true)) <: Vector
@@ -210,6 +212,8 @@ function test_DDP_MIP_initialization_remote()
     @test get_time_forward_pass(BendersAlg) == 0
     @test get_time_backward_pass(BendersAlg) == 0
     @test get_time_init(BendersAlg) > 0
+    @test get_time_forward_pass(BendersAlg) == 0
+    @test get_time_backward_pass(BendersAlg) == 0
     @test typeof(get_time_iterations(BendersAlg)) <: Vector
     @test typeof(get_lower_bounds(BendersAlg)) <: Vector
     @test typeof(get_upper_bounds(BendersAlg, monotonic = true)) <: Vector

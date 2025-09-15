@@ -166,6 +166,8 @@ mutable struct BendersAlgorithm{T, V} <: AbstractPBAlgorithm{T, V}
     time_backward_pass::Float64
     time_init::Float64
     time_iterations::Vector{Float64}
+    time_root_problem_solve::Float64
+    time_subproblem_solves::Float64
 
     comp_vars::Dict{T, Vector{V}}
     comp_var_map::Dict{T, Dict{V, Int}}
@@ -228,6 +230,8 @@ mutable struct BendersAlgorithm{T, V} <: AbstractPBAlgorithm{T, V}
         optimizer.time_backward_pass = 0.
         optimizer.time_init = 0.
         optimizer.time_iterations = Vector{Float64}()
+        optimizer.time_root_problem_solve = 0.
+        optimizer.time_subproblem_solves = 0.
 
         optimizer.comp_vars = Dict{T, Vector{V}}()
         optimizer.comp_var_map = Dict{T, Dict{V, Int}}()
@@ -664,7 +668,9 @@ function _forward_pass!(optimizer::BendersAlgorithm)
     ########## Solve the first node ############
     root_object = optimizer.solve_order[1]
 
-    JuMP.optimize!(root_object)
+
+    t_solve = @elapsed JuMP.optimize!(root_object)
+    optimizer.time_root_problem_solve += t_solve
 
     root_object_feasibility = _check_termination_status(root_object, 1; add_slacks_bool=get_add_slacks(optimizer), feasibility_cuts_bool=get_feasibility_cuts(optimizer))
 

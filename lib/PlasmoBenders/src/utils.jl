@@ -418,6 +418,8 @@ _algorithm_fields = [
     :time_backward_pass,
     :time_init,
     :time_iterations,
+    :time_root_problem_solve,
+    :time_subproblem_solves,
     :lower_bounds,
 ]
 

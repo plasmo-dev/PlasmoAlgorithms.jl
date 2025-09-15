@@ -60,7 +60,8 @@ function _regularize_pass!(
         V = Plasmo.variable_type(optimizer.graph)
         @objective(object, Min, GenericAffExpr{Float64, V}(0.0))
 
-        optimize!(object)
+        t_solve = @elapsed optimize!(object)
+        optimizer.time_root_problem_solve += t_solve
 
         if termination_status(object) != MOI.INFEASIBLE
             obj_val_minus_theta = value(object, original_objective) - _theta_value(optimizer, object)

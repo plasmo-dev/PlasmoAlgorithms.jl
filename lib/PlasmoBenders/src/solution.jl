@@ -115,7 +115,8 @@ function _update_objective_and_optimize(optimizer, next_object)
     #@objective(next_object, Min, next_object_objective_function)
 
     # Get the new solution
-    optimize!(next_object)
+    t_solve = @elapsed optimize!(next_object)
+    optimizer.time_subproblem_solves += t_solve
 
     # Save the data from the new solution
     new_phi_LR = objective_value(next_object)
@@ -160,7 +161,7 @@ function _optimize_in_forward_pass_multithread!(optimizer::BendersAlgorithm{Remo
 
                 JuMP.fix.(lvar_copies, last_primals, force = true)
 
-                optimize!(lgraph)
+                t_solve = @elapsed optimize!(lgraph)
 
                 is_feasible = _check_termination_status(lgraph, i; add_slacks_bool=add_slacks, feasibility_cuts_bool=feasibility_cuts)
 
@@ -185,10 +186,11 @@ function _optimize_in_forward_pass_multithread!(optimizer::BendersAlgorithm{Remo
                     error("Model on graph $i terminated with status $(termination_status(lgraph))")
                 end
 
-                is_feasible, obj_val, duals
+                is_feasible, obj_val, duals, t_solve
             end
 
-            is_feasible, obj_val, duals = fetch(f)
+            is_feasible, obj_val, duals, t_solve = fetch(f)
+            optimizer.time_subproblem_solves += t_solve
             if !is_feasible
                 ub[1] = Inf
             else
@@ -229,7 +231,8 @@ function _forward_pass_iteration!(optimizer, i, ub)
     PlasmoBenders._fix_variables(next_object, var_copies, last_primals)
 
     # Optimize the next node
-    optimize!(next_object)
+    t_solve = @elapsed optimize!(next_object)
+    optimizer.time_subproblem_solves += t_solve
 
     # Check termination status
     object_termination_status = _check_termination_status(next_object, i; add_slacks_bool=get_add_slacks(optimizer), feasibility_cuts_bool=get_feasibility_cuts(optimizer))
@@ -345,7 +348,8 @@ function _optimize_in_backward_pass(optimizer, i)
     end
 
     # Optimize the next node
-    optimize!(object)
+    t_solve = @elapsed optimize!(object)
+    optimizer.time_subproblem_solves += t_solve
 
     # Check termination status
     object_termination_status = _check_termination_status(object, i; add_slacks_bool=get_add_slacks(optimizer), feasibility_cuts_bool=get_feasibility_cuts(optimizer))
