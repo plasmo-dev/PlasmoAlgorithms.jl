@@ -218,25 +218,29 @@ function _add_slack_to_node(optimizer::BendersAlgorithm, next_object, node::N, n
         push!(slack_vars_dict[next_object], var)
     end
 
-    # Get the objective function
-    obj_func = objective_function(node)
+    slack_expr = sum(slack_penalty * (_slack_up[i] + _slack_down[i]) for i in 1:num_links)
 
-    # Ensure the objective is an Affine Expression
-    if isa(obj_func, V)
-        obj_func = GenericAffExpr{Float64, V}(0, obj_func => 1)
-    elseif typeof(obj_func) == nothing
-        obj_func = GenericAffExpr{Float64, V}()
-    end
+    _add_to_objective_function(next_object, slack_expr)
 
-    # Add the slacks to the objective function
-    for i in 1:num_links
-        JuMP.add_to_expression!(obj_func, slack_penalty * _slack_up[i])
-        JuMP.add_to_expression!(obj_func, slack_penalty * _slack_down[i])
-    end
+    # # Get the objective function
+    # obj_func = objective_function(node)
 
-    # Reset the objective so it has the slacks
-    #JuMP.set_objective_function(node, obj_func)
-    @objective(node, Min, obj_func)
+    # # Ensure the objective is an Affine Expression
+    # if isa(obj_func, V)
+    #     obj_func = GenericAffExpr{Float64, V}(0, obj_func => 1)
+    # elseif typeof(obj_func) == nothing
+    #     obj_func = GenericAffExpr{Float64, V}()
+    # end
+
+    # # Add the slacks to the objective function
+    # for i in 1:num_links
+    #     JuMP.add_to_expression!(obj_func, slack_penalty * _slack_up[i])
+    #     JuMP.add_to_expression!(obj_func, slack_penalty * _slack_down[i])
+    # end
+
+    # # Reset the objective so it has the slacks
+    # #JuMP.set_objective_function(node, obj_func)
+    # @objective(node, Min, obj_func)
 end
 
 function _add_slack_to_node_for_links(optimizer::BendersAlgorithm, next_object::T, node::N, num_links, slack_penalty) where {T <: Plasmo.AbstractOptiGraph, N <: Union{Plasmo.OptiNode, Plasmo.RemoteNodeRef}}
@@ -258,25 +262,29 @@ function _add_slack_to_node_for_links(optimizer::BendersAlgorithm, next_object::
         push!(slack_vars_dict[next_object], var)
     end
 
-    # Get the objective function
-    obj_func = objective_function(node)
+    slack_expr = sum(slack_penalty * (_slack_up_link[i] + _slack_down_link[i]) for i in 1:num_links)
 
-    # Ensure the objective is an Affine Expression
-    if isa(obj_func, V)
-        obj_func = GenericAffExpr{Float64, V}(0, obj_func => 1)
-    elseif isnothing(obj_func)
-        obj_func = GenericAffExpr{Float64, V}()
-    end
+    _add_to_objective_function(next_object, slack_expr)
 
-    # Add the slacks to the objective function
-    for i in 1:num_links
-        JuMP.add_to_expression!(obj_func, slack_penalty * _slack_up_link[i])
-        JuMP.add_to_expression!(obj_func, slack_penalty * _slack_down_link[i])
-    end
+    # # Get the objective function
+    # obj_func = objective_function(node)
 
-    # Reset the objective so it has the slacks
-    #JuMP.set_objective_function(node, obj_func)
-    @objective(node, Min, obj_func)
+    # # Ensure the objective is an Affine Expression
+    # if isa(obj_func, V)
+    #     obj_func = GenericAffExpr{Float64, V}(0, obj_func => 1)
+    # elseif isnothing(obj_func)
+    #     obj_func = GenericAffExpr{Float64, V}()
+    # end
+
+    # # Add the slacks to the objective function
+    # for i in 1:num_links
+    #     JuMP.add_to_expression!(obj_func, slack_penalty * _slack_up_link[i])
+    #     JuMP.add_to_expression!(obj_func, slack_penalty * _slack_down_link[i])
+    # end
+
+    # # Reset the objective so it has the slacks
+    # #JuMP.set_objective_function(node, obj_func)
+    # @objective(node, Min, obj_func)
 
 end
 
