@@ -295,6 +295,12 @@ end
 function _save_feasibility_cut_data(optimizer, next_object, ub)
     # See JuMP documentation for implementation of this method:
     # https://jump.dev/JuMP.jl/stable/tutorials/algorithms/benders_decomposition/#Feasibility-cuts
+
+    if get_regularize(optimizer)
+        get_regularize_lbs(optimizer)[next_object] = -Inf
+        get_regularize_ubs(optimizer)[next_object] = Inf
+    end
+    
     if !optimizer.is_MIP
         obj_val = JuMP.dual_objective_value(next_object)
 

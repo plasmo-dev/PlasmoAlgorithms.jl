@@ -105,7 +105,8 @@ function _regularize_pass!(
         _add_to_upper_bound!(optimizer, object, ub)
         get_regularize_ubs(optimizer)[object] = JuMP.objective_value(object)
 
-        if !optimizer.is_MIP
+        if !optimizer.is_MIP #TODO: This can probably be moved to _save_forward_pass_solutions function; doesn't need to be here
+            # we could actually probably only call _regularize_pass! on the root problem
             next_duals = _get_next_duals(optimizer, object)
             dual_iters = optimizer.dual_iters[object]
             optimizer.dual_iters[object] = hcat(dual_iters, next_duals)
