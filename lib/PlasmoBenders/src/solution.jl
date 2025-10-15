@@ -375,6 +375,10 @@ function _optimize_in_backward_pass(optimizer, i)
             println("Subgraph $i in backwards pass was infeasible; using feasibility_cuts")
             next_phi = JuMP.dual_objective_value(object)
             optimizer.feasibility_map[object] = false
+            if get_regularize(optimizer)
+                get_regularize_lbs(optimizer)[object] = -Inf
+                get_regularize_ubs(optimizer)[object] = Inf
+            end
         end
 
         optimizer.dual_iters[object] = hcat(dual_iters, next_duals)
