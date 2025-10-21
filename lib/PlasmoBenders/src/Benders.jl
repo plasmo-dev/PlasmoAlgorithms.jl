@@ -36,6 +36,7 @@ mutable struct BendersOptions <: AbstractPBOptions
     multicut::Bool
     feasibility_cuts::Bool
     regularize::Bool
+    sequential_backward_pass::Bool
     parallelize_benders::Bool
     parallelize_forward::Bool
     parallelize_backward::Bool
@@ -54,6 +55,7 @@ mutable struct BendersOptions <: AbstractPBOptions
         options.multicut = false
         options.feasibility_cuts = false
         options.regularize = false
+        options.sequential_backward_pass = false
         options.parallelize_benders = false
         options.parallelize_forward = false
         options.parallelize_backward = false
@@ -329,6 +331,7 @@ function BendersAlgorithm(
     multicut::Bool = true,
     feasibility_cuts::Bool = false,
     regularize::Bool = false,
+    sequential_backward_pass::Bool = false,
     parallelize_benders::Bool = false,
     parallelize_forward::Bool = false,
     parallelize_backward::Bool = false,
@@ -357,6 +360,7 @@ function BendersAlgorithm(
         set_multicut!(optimizer, multicut)
         set_feasibility_cuts!(optimizer, feasibility_cuts)
         set_regularize!(optimizer, regularize)
+        set_sequential_backward_pass!(optimizer, sequential_backward_pass)
         set_parallelize_benders!(optimizer, parallelize_benders)
         set_parallelize_forward!(optimizer, parallelize_forward)
         set_parallelize_backward!(optimizer, parallelize_backward)
@@ -370,6 +374,22 @@ function BendersAlgorithm(
 
         if parallelize_forward
             @warn("`parallelize_forward` is not yet supported. Benders will run, but the forward pass will not be parallelized")
+        end
+        if sequential_backward_pass && parallelize_backward
+            @warn(
+                "`sequential_backward_pass` and `parallelize_backward` cannot both be set to true. " *
+                "`parallelize_backward` is being set to `false`"
+            )
+            parallelize_backward = false
+            set_parallelize_backward!(optimizer, false)
+        end
+        if sequential_backward_pass && parallelize_benders
+            @warn(
+                "`sequential_backward_pass` and `parallelize_benders` cannot both be set to true. " *
+                "`sequential_backward_pass` is being set to `false`"
+            )
+            sequential_backward_pass = false
+            set_sequential_backward_pass!(optimizer, false)
         end
         if feasibility_cuts
             @warn(
@@ -720,22 +740,23 @@ function _backward_pass!(optimizer::BendersAlgorithm; strengthened::Bool = false
     len_solve_order = length(optimizer.solve_order)
 
     # Perform backward pass in parallel
-    #Threads.@threads for i in 1:len_solve_order
     if get_parallelize_backward(optimizer) || get_parallelize_benders(optimizer)
-        Threads.@threads for i in 1:len_solve_order
+        Threads.@threads for i in len_solve_order:-1:1
             _optimize_in_backward_pass(optimizer, i)
         end
     else
-        for i in 1:len_solve_order
+        for i in len_solve_order:-1:1
             _optimize_in_backward_pass(optimizer, i)
         end
     end
 
     # Add constraint on the cost-to-go to last node Bender's cut
-    if get_strengthened(optimizer)
-        _add_strengthened_cuts!(optimizer)
-    else
-        _add_Benders_cuts!(optimizer)
+    if !(get_sequential_backward_pass(optimizer))
+        if get_strengthened(optimizer)
+            _add_strengthened_cuts!(optimizer)
+        else
+            _add_Benders_cuts!(optimizer)
+        end
     end
 
     return nothing

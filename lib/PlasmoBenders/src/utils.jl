@@ -351,6 +351,7 @@ _options_bool_fields = [
     :multicut,
     :feasibility_cuts,
     :regularize,
+    :sequential_backward_pass,
     :parallelize_benders,
     :parallelize_forward,
     :parallelize_backward,
