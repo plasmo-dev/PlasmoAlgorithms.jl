@@ -59,6 +59,17 @@ module Test_MIP_solves
         @test isapprox(get_gap(DDPOpt), 0, rtol = 1e-6)
 
         gtest = build_graph()
+        DDPOpt = BendersAlgorithm(gtest, local_subgraphs(gtest)[1], max_iters = 20, sequential_backward_pass = true);
+        run_algorithm!(DDPOpt)
+        @test isapprox(DDPOpt.best_upper_bound, 5.8, rtol = 1e-6)
+
+        gtest = build_graph()
+        DDPOpt = BendersAlgorithm(gtest, local_subgraphs(gtest)[1], max_iters = 20, strengthened = true, sequential_backward_pass = true);
+        run_algorithm!(DDPOpt)
+        @test isapprox(DDPOpt.best_upper_bound, 5.8, rtol = 1e-6)
+        @test isapprox(get_gap(DDPOpt), 0, rtol = 1e-6)
+
+        gtest = build_graph()
         DDPOpt = BendersAlgorithm(gtest, local_subgraphs(gtest)[1], max_iters = 20, strengthened = true, multicut = true);
         run_algorithm!(DDPOpt)
         @test isapprox(DDPOpt.best_upper_bound, 5.8, rtol = 1e-6)
