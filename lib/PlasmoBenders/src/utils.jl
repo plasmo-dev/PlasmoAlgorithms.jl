@@ -23,6 +23,31 @@ end
 Base.print(io::IO, optimizer::BendersAlgorithm) = Base.print(io, Base.string(optimizer))
 Base.show(io::IO, optimizer::BendersAlgorithm) = Base.print(io, optimizer)
 
+# Enable printing the optimizer
+function Base.string(optimizer::BendersAlgorithm)
+    return return @sprintf(
+        """
+        A BendersAlgorithm
+        -------------------------------------------
+        %32s %9s
+        %32s %9s
+        %32s %9s
+        %32s %9s
+        """,
+        "Num subproblem subgraphs:",
+        length(optimizer.solve_order),
+        "MIP subproblems (nonroot):",
+        optimizer.is_MIP,
+        "Absolute Tolerance:",
+        optimizer.tol,
+        "Maximum Iterations:",
+        optimizer.max_iters,
+    )
+end
+
+Base.print(io::IO, optimizer::BendersAlgorithm) = Base.print(io, Base.string(optimizer))
+Base.show(io::IO, optimizer::BendersAlgorithm) = Base.print(io, optimizer)
+
 function _get_hyper_projection(optimizer::BendersAlgorithm, graph::Plasmo.OptiGraph)
     if haskey(optimizer.ext, "_projection")
         return optimizer.ext["_projection"]
@@ -402,6 +427,7 @@ _options_bool_fields = [
     :multicut,
     :feasibility_cuts,
     :regularize,
+    :sequential_backward_pass,
     :parallelize_benders,
     :parallelize_forward,
     :parallelize_backward,
@@ -465,7 +491,7 @@ function get_upper_bounds(optimizer::BendersAlgorithm; monotonic = true)
         if optimizer.current_iter == 0
             return ubs
         else
-            return [minimum(ubs[1:i] for i in 1:length(ubs))]
+            return [minimum(ubs[1:i]) for i in 1:length(ubs)]
         end
     else
         return ubs
