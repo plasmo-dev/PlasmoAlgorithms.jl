@@ -32,91 +32,6 @@ function _add_constraint_set_to_subproblem!(
     return nothing
 end
 
-# function _add_constraint_set_to_subproblem!(
-#     optimizer::BendersAlgorithm{Plasmo.RemoteOptiGraph}, 
-#     cons::Vector{ConstraintRef}, 
-#     next_object::Plasmo.RemoteOptiGraph, 
-#     node::Plasmo.RemoteNodeRef, 
-#     comp_vars::Vector{Plasmo.RemoteVariableRef}, 
-#     var_copy_map::Dict, 
-#     link::Bool, 
-#     slack::Bool
-# )
-#     if get_add_slacks(optimizer)
-#         _add_slack_to_node(optimizer, next_object, node, length(cons), slack_penalty)
-#         for (j, con) in enumerate(cons)
-#             con_obj = JuMP.constraint_object(con)
-#             _add_constraint_to_subproblem!(con_obj, comp_vars, var_copy_map,
-#                                           next_object, node, link; slack = slack,
-#                                           slack_up = node[:_slack_up][j],
-#                                           slack_down = node[:_slack_down][j]
-#             )
-#         end
-#     else
-#         con_objs = JuMP.constraint_object.(cons)
-#         exprs = GenericAffExpr[]
-#         constants = Number[]
-#         funcs = []
-#         for con in con_objs
-#             new_expr = GenericAffExpr{Float64, Plasmo.RemoteVariableRef}()
-
-#             for (i, var) in enumerate(con.func.terms.keys)
-#                 if var in comp_vars
-#                     add_to_expression!(new_expr, var_copy_map[var] * con.func.terms[var])
-#                 else
-#                     add_to_expression!(new_expr, var * con.func.terms[var])
-#                 end
-#             end #TODO: Make this its own function?
-#             push!(exprs, new_expr)
-#             push!(constants, _get_function_constant(con))
-#             push!(funcs, con.set)
-#         end
-
-#         darray = next_object.graph
-#         pnode = Plasmo._convert_remote_to_proxy(next_object, node)
-#         #pexpr = Plasmo._convert_remote_to_proxy(next_object, expr)
-#         f = @spawnat next_object.worker begin
-#             lgraph = Plasmo.local_graph(darray)
-#             if !link 
-#                 lnode = Plasmo._convert_proxy_to_local(lgraph, pnode)
-#             end
-#             for (i, expr) in enumerate(exprs)
-#                 lexpr = Plasmo._convert_remote_to_local(lgraph, pexpr)
-#                 if link
-#                     if isa(funcs[i], MOI.GreaterThan)
-#                         @linkconstraint(lgraph, lexpr >= constants[i])
-#                     elseif isa(funcs[i], MOI.LessThan)
-#                         @linkconstraint(lgraph, lexpr <= constants[i])
-#                     elseif isa(funcs[i], MOI.EqualTo)
-#                         @linkconstraint(lgraph, lexpr == constants[i])
-#                     end
-#                 else
-#                     if isa(funcs[i], MOI.GreaterThan)
-#                         @constraint(lnode, lexpr >= constants[i])
-#                     elseif isa(funcs[i], MOI.LessThan)
-#                         @constraint(lnode, lexpr <= constants[i])
-#                     elseif isa(funcs[i], MOI.EqualTo)
-#                         @constraint(lnode, lexpr == constants[i])
-#                     end
-#                 end
-#             end
-#         end
-#     end
-#     return nothing
-# end
-# 
-# function _get_function_constant(con::ScalarConstraint)
-#     if isa(con.set, MOI.GreaterThan)
-#         return con.set.lower
-#     elseif isa(con.set, MOI.LessThan)
-#         return con.set.upper
-#     elseif isa(con.set, MOI.EqualTo)
-#         return con.set.value
-#     else 
-#         error("Constraint is of type $(typeof(con.set)) which is not implemented")
-#     end
-# end
-
 function _add_constraint_to_subproblem!(
     con_obj::ScalarConstraint{GenericAffExpr{Float64, V}, MOI.LessThan{Float64}},
     comp_vars,
@@ -376,6 +291,20 @@ function _add_constraint_to_subproblem!(
     end
 end
 
+function _get_con_obj_var_sets(con_obj::ScalarConstraint{GenericQuadExpr{Float64, V}, S}, next_object_nodes, last_object_nodes) where {V, S}
+    affvars = con_obj.func.aff.terms.keys
+    quadterms = collect(con_obj.func.terms.keys)
+    quadtermsa = [term.a for term in quadterms]
+    quadtermsb = [term.b for term in quadterms]
+    quadvars = unique(vcat(quadtermsa, quadtermsb))
+
+    vars = union(affvars, quadvars)
+    
+    next_object_link_vars = [var for var in vars if JuMP.owner_model(var) in next_object_nodes]
+    last_object_link_vars = [var for var in vars if JuMP.owner_model(var) in last_object_nodes]
+
+    return vars, next_object_link_vars, last_object_link_vars
+end
 
 ########## END QUADRATICS
 
@@ -410,21 +339,6 @@ end
 function _get_con_obj_var_sets(con_obj::ScalarConstraint{GenericAffExpr{Float64, V}, S}, next_object_nodes, last_object_nodes) where {V, S}
     vars = con_obj.func.terms.keys
 
-    next_object_link_vars = [var for var in vars if JuMP.owner_model(var) in next_object_nodes]
-    last_object_link_vars = [var for var in vars if JuMP.owner_model(var) in last_object_nodes]
-
-    return vars, next_object_link_vars, last_object_link_vars
-end
-
-function _get_con_obj_var_sets(con_obj::ScalarConstraint{GenericQuadExpr{Float64, V}, S}, next_object_nodes, last_object_nodes) where {V, S}
-    affvars = con_obj.func.aff.terms.keys
-    quadterms = collect(con_obj.func.terms.keys)
-    quadtermsa = [term.a for term in quadterms]
-    quadtermsb = [term.b for term in quadterms]
-    quadvars = unique(vcat(quadtermsa, quadtermsb))
-
-    vars = union(affvars, quadvars)
-    
     next_object_link_vars = [var for var in vars if JuMP.owner_model(var) in next_object_nodes]
     last_object_link_vars = [var for var in vars if JuMP.owner_model(var) in last_object_nodes]
 
