@@ -517,6 +517,8 @@ function BendersAlgorithm(
         # Construct regularization abilities if needed
         if get_regularize(optimizer)
             _construct_regularize!(optimizer)
+            @info("You have set regularize to `true`, so the algorithm will perform an extra optimization step with a zero objective. " * 
+            "Current Plasmo versions throw a warning if the objective is zero. These warnings during `run_algorithm!` can be ignored.")
         end
     end
 

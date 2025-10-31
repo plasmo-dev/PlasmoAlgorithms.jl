@@ -79,8 +79,19 @@ function test_graphs()
     run_algorithm!(DDPOpt)
     @test isapprox(DDPOpt.best_upper_bound, 0, rtol = 1e-6)
 
+    gtest = build_graph(true)
+    DDPOpt = BendersAlgorithm(gtest, local_subgraphs(gtest)[1], max_iters = 20, add_slacks = false, sequential_backward_pass = true);
+    run_algorithm!(DDPOpt)
+    @test isapprox(DDPOpt.best_upper_bound, 0, rtol = 1e-6)
+
     gtest = build_graph()
     DDPOpt = BendersAlgorithm(gtest, local_subgraphs(gtest)[1], max_iters = 20, multicut = true);
+    run_algorithm!(DDPOpt)
+    @test isapprox(DDPOpt.best_upper_bound, 5.5, rtol = 1e-6)
+    @test isapprox(get_gap(DDPOpt), 0, rtol = 1e-6)
+
+    gtest = build_graph()
+    DDPOpt = BendersAlgorithm(gtest, local_subgraphs(gtest)[1], max_iters = 20, multicut = true, sequential_backward_pass = true);
     run_algorithm!(DDPOpt)
     @test isapprox(DDPOpt.best_upper_bound, 5.5, rtol = 1e-6)
     @test isapprox(get_gap(DDPOpt), 0, rtol = 1e-6)

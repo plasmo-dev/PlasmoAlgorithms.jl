@@ -7,7 +7,7 @@ using Printf
 const PB = PlasmoBenders
 const MOI = MathOptInterface
 
-export BendersAlgorithm, relative_gap, run_algorithm!, get_upper_bounds
+export BendersAlgorithm, relative_gap, run_algorithm!, get_upper_bounds, relative_gap
 
 include("Benders.jl")
 include("utils.jl")

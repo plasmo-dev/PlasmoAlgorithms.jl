@@ -284,10 +284,8 @@ function _optimize_in_backward_pass(optimizer, i)
     JuMP.set_integer.(int_vars) #TODO: fix bounds on integer vars?
 
 
-    if get_sequential_backward_pass(optimizer) && haskey(optimizer.parent_objects, object)
-        if get_strengthened(optimizer)
-            _solve_for_strengthened_cuts(optimizer, i - 1) #this function calls i + 1, so we subtract one here
-        end
+    if (get_sequential_backward_pass(optimizer) && haskey(optimizer.parent_objects, object)) && get_strengthened(optimizer)
+        _solve_for_strengthened_cuts(optimizer, i - 1) #this function calls i + 1, so we subtract one here
     end
 end
 

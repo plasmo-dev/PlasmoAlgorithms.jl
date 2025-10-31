@@ -1,6 +1,5 @@
 using Revise
-using Plasmo, JuMP, HiGHS, Plots, PlasmoBenders
-using Plasmo, HiGHS, JuMP
+using Plasmo, HiGHS, JuMP, PlasmoBenders
 
 g0 = OptiGraph()
 g1 = OptiGraph()
@@ -38,7 +37,7 @@ for i in gs
     set_optimizer(i, solver)
 end
 
-BendersOpt = BendersAlgorithm(g0, g1; max_iters = 20, parallelize_benders = true, regularize = false)
+BendersOpt = BendersAlgorithm(g0, g1; max_iters = 20, sequential_backward_pass = true, regularize = false, strengthened = true)
 
 t2 = @elapsed begin
     run_algorithm!(BendersOpt)
