@@ -701,11 +701,13 @@ function _forward_pass!(optimizer::BendersAlgorithm)
     root_object = optimizer.solve_order[1]
 
 
-    t_solve = @elapsed JuMP.optimize!(root_object)
+    t_solve = @elapsed begin
+        JuMP.optimize!(root_object)
+        
+        root_object_feasibility = _check_termination_status(root_object, 1; add_slacks_bool=get_add_slacks(optimizer), feasibility_cuts_bool=get_feasibility_cuts(optimizer))
+    end
     optimizer.time_root_problem_solve += t_solve
-
-    root_object_feasibility = _check_termination_status(root_object, 1; add_slacks_bool=get_add_slacks(optimizer), feasibility_cuts_bool=get_feasibility_cuts(optimizer))
-
+    
     # Get initial objective
     root_objective = JuMP.objective_value(root_object)
 
