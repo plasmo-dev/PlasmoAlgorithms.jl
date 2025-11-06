@@ -44,7 +44,7 @@ Nested Benders Decomposition (NBD) is similar to BD but includes more than two "
 
 ![NBD](../figures/nested_benders_solution.png)
 
-In NBD, there is a "forward-pass" where each stage is solved sequentially and primal solutions are shared to and fixed in the next stage. After each stage has been solved, information can be shared to the previous stage in a "backward-pass" to form cutting planes on each previous stage. 
+In NBD, there is a "forward-pass" where each stage is solved sequentially and primal solutions are shared to and fixed in the next stage. After each stage has been solved, information can be shared to the previous stage in a "backward-pass" to form cutting planes on each previous stage. Many variants of NBD exist, and PlasmoBenders supports two different variants of the backwards pass.
 
 ## Implementation in PlasmoBenders.jl
 PlasmoBenders.jl implements the NBD algorithm. BD can be considered a specialized case of NBD, such that we only need to implement a single algorithm in the code. There are many additional parameters and techniques that NBD can include, and these are covered in other pages of the documentation. 

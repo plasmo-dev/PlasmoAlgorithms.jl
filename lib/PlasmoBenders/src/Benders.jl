@@ -18,6 +18,7 @@ Attributes include
    there are multiple objects generating information in the forward pass
  - `feasibility_cuts::Bool` - whether to allow feasibility cuts if infeasible
  - `regularize::Bool` - whether to used regularization for getting next cuts
+ - `sequential_backward_pass::Bool` - whether to do the backwards pass and cut passing sequentially
  - `parallelize_benders::Bool` - whether to parallelize Benders problems if applicable
  - `parallelize_forward::Bool` - whether to parallelize the forward pass if possible
  - `parallelize_backward::Bool` - whether to parallelize the backward pass if possible
@@ -272,6 +273,7 @@ OptiNode or subgraph on `graph`. key ward arguments include the following
  - `multicut = true` - whether to use multicuts (rather than aggregated cuts) when applicable
  - `feasibility_cuts = false` - whether to allow feasibility cuts
  - `regularize = false` - whether to regularize solution of next iterates
+ - `sequential_backward_pass::Bool` - whether to do the backwards pass and cut passing sequentially
  - `parallelize_benders = false` - whether to parallelize subproblem solution when the problem
    has a Benders-type structure defined
  - `parallelize_forward = false` - whether to parallelize forward pass if possible; not yet supported
