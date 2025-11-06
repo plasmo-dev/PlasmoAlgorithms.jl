@@ -297,6 +297,8 @@ OptiNode or subgraph on `graph`. key ward arguments include the following
    solving the whole problem; only applies for MILPs
  - `slack_penalty = 1e6` - coefficient on slack variables in objective
  - `regularize_param = 0.5` - regularization parameter; must be between 0 and 1
+ - `set_graph_objectives_from_nodes` - whether to set the subgraph objectives from node objectives;
+     This can be used if the user has not called `set_to_node_objectives` on all subgraphs
 """
 function BendersAlgorithm(
     graph::Plasmo.OptiGraph,
@@ -372,7 +374,13 @@ function BendersAlgorithm(
         end
         for (i, g) in enumerate(local_subgraphs(graph))
             if objective_sense(g) != MOI.MIN_SENSE
-                error("Objective sense of subgraph $i is $(objective_sense(g)). All graphs must use MIN_SENSE for algorithm")
+                if objective_sense(g) == MOI.FEASIBILITY_SENSE
+                    error("Objective of subgraph is feasibility sense. This likely means you have not set objectives on a subgraph.\n
+                        If you have objectives on nodes that you intend to use for subgraphs, rerun the algorithm constructor\n
+                        setting the keyword argument `set_graph_objectives_from_nodes=true`.")
+                else
+                    error("Objective sense of subgraph $i is $(objective_sense(g)). All graphs must use MIN_SENSE for algorithm.")
+                end
             end
         end
 
