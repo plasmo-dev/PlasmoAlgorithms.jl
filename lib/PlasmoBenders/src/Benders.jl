@@ -754,13 +754,9 @@ function _backward_pass!(optimizer::BendersAlgorithm; strengthened::Bool = false
 
     # Perform backward pass in parallel
     if get_parallelize_backward(optimizer) || get_parallelize_benders(optimizer)
-        Threads.@threads for i in len_solve_order:-1:1
-            _optimize_in_backward_pass(optimizer, i)
-        end
+        _optimize_in_backward_pass_multithread!(optimizer)
     else
-        for i in len_solve_order:-1:1
-            _optimize_in_backward_pass(optimizer, i)
-        end
+        _optimize_in_backward_pass!(optimizer)
     end
 
     # Add constraint on the cost-to-go to last node Bender's cut

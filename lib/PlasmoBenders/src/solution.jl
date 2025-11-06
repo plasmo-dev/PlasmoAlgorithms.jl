@@ -102,55 +102,13 @@ end
 
 function _optimize_in_forward_pass_multithread!(optimizer::BendersAlgorithm{RemoteOptiGraph}, ub)
     is_MIP = optimizer.is_MIP
-    feasibility_cuts = get_feasibility_cuts(optimizer)
     regularize = get_regularize(optimizer)
-    add_slacks = get_add_slacks(optimizer)
     @sync for i in 2:(length(optimizer.solve_order))
         @async begin
             next_object = optimizer.solve_order[i]
 
-            comp_vars = optimizer.comp_vars[next_object]
-            var_copy_map = optimizer.var_copy_map[next_object]
-            primal_iters = optimizer.primal_iters[next_object]
-            last_primals = primal_iters[:, size(primal_iters, 2)]
-            var_copies = [var_copy_map[var] for var in comp_vars]
-            pvar_copies = Plasmo._convert_remote_to_proxy(next_object, var_copies)
-            darray = next_object.graph
-            f = @spawnat next_object.worker begin
-                lgraph = Plasmo.local_graph(darray)
-                lvar_copies = Plasmo._convert_proxy_to_local(lgraph, pvar_copies)
-
-                JuMP.fix.(lvar_copies, last_primals, force = true)
-
-                t_solve = @elapsed optimize!(lgraph)
-
-                is_feasible = _check_termination_status(lgraph, i; add_slacks_bool=add_slacks, feasibility_cuts_bool=feasibility_cuts)
-
-                if feasibility_cuts && !(is_feasible)
-                    obj_val = JuMP.dual_objective_value(next_object)
-                    println("Subgraph $i in forward pass was infeasible; using feasibility_cuts")
-
-                    if !is_MIP
-                        duals = Float64[JuMP.dual(lgraph, FixRef(var)) for var in lvar_copies]
-                    else
-                        duals = nothing
-                    end
-                elseif is_feasible
-                    obj_val = JuMP.value(lgraph, JuMP.objective_function(lgraph))
-
-                    if !is_MIP
-                        duals = Float64[JuMP.dual(lgraph, FixRef(var)) for var in lvar_copies]
-                    else
-                        duals = nothing
-                    end
-                else
-                    error("Model on graph $i terminated with status $(termination_status(lgraph))")
-                end
-
-                is_feasible, obj_val, duals, t_solve
-            end
-
-            is_feasible, obj_val, duals, t_solve = fetch(f)
+            is_feasible, obj_val, duals, t_solve = _optimize_remote_graph_forward(optimizer, next_object)
+            
             optimizer.time_subproblem_solves += t_solve
             if !is_feasible
                 ub[1] = Inf
@@ -171,6 +129,56 @@ function _optimize_in_forward_pass_multithread!(optimizer::BendersAlgorithm{Remo
             end
         end
     end
+end
+
+function _optimize_remote_graph_forward(optimizer::BendersAlgorithm, next_object::RemoteOptiGraph)
+    feasibility_cuts = get_feasibility_cuts(optimizer)
+    regularize = get_regularize(optimizer)
+    add_slacks = get_add_slacks(optimizer)
+
+    comp_vars = optimizer.comp_vars[next_object]
+    var_copy_map = optimizer.var_copy_map[next_object]
+    primal_iters = optimizer.primal_iters[next_object]
+    last_primals = primal_iters[:, size(primal_iters, 2)]
+    var_copies = [var_copy_map[var] for var in comp_vars]
+    pvar_copies = Plasmo._convert_remote_to_proxy(next_object, var_copies)
+    darray = next_object.graph
+    f = @spawnat next_object.worker begin
+        lgraph = Plasmo.local_graph(darray)
+        lvar_copies = Plasmo._convert_proxy_to_local(lgraph, pvar_copies)
+
+        JuMP.fix.(lvar_copies, last_primals, force = true)
+
+        t_solve = @elapsed optimize!(lgraph)
+
+        is_feasible = _check_termination_status(lgraph, i; add_slacks_bool=add_slacks, feasibility_cuts_bool=feasibility_cuts)
+
+        if feasibility_cuts && !(is_feasible)
+            obj_val = JuMP.dual_objective_value(next_object)
+            println("Subgraph $i in forward pass was infeasible; using feasibility_cuts")
+
+            if !is_MIP
+                duals = Float64[JuMP.dual(lgraph, FixRef(var)) for var in lvar_copies]
+            else
+                duals = nothing
+            end
+        elseif is_feasible
+            obj_val = JuMP.value(lgraph, JuMP.objective_function(lgraph))
+
+            if !is_MIP
+                duals = Float64[JuMP.dual(lgraph, FixRef(var)) for var in lvar_copies]
+            else
+                duals = nothing
+            end
+        else
+            error("Model on graph $i terminated with status $(termination_status(lgraph))")
+        end
+
+        is_feasible, obj_val, duals, t_solve
+    end
+
+    is_feasible, obj_val, duals, t_solve = fetch(f)
+    return is_feasible, obj_val, duals, t_solve
 end
 
 function _optimize_in_forward_pass!(optimizer, ub) 
@@ -279,7 +287,29 @@ function _save_feasibility_cut_data(optimizer, next_object, ub)
     end
 end
 
-function _optimize_in_backward_pass(optimizer, i)
+function _optimize_in_backward_pass_multithread!(optimizer::BendersAlgorithm{OptiGraph})
+    len_solve_order = length(optimizer.solve_order)
+    Threads.@threads for i in len_solve_order:-1:1
+        _backward_pass_iteration!(optimizer, i)
+    end
+end
+
+function _optimize_in_backward_pass_multithread!(optimizer::BendersAlgorithm{RemoteOptiGraph})
+    @sync for i in 2:(length(optimizer.solve_order))
+        @async begin
+            _backward_pass_iteration!(optimizer, i)
+        end
+    end
+end
+
+function _optimize_in_backward_pass!(optimizer::BendersAlgorithm)
+    len_solve_order = length(optimizer.solve_order)
+    for i in len_solve_order:-1:1
+        _backward_pass_iteration!(optimizer, i)
+    end
+end
+
+function _backward_pass_iteration!(optimizer::BendersAlgorithm, i)
     object = optimizer.solve_order[i]
 
     next_objects = optimizer.solve_order_dict[object]
@@ -291,21 +321,9 @@ function _optimize_in_backward_pass(optimizer, i)
         end
     end
 
-    ### Unset binary/integer variables
-    bin_vars_dict = optimizer.binary_map[object]
-    int_vars_dict = optimizer.integer_map[object]
-
-    bin_vars = collect(keys(bin_vars_dict))
-    int_vars = collect(keys(int_vars_dict))
-
-    # Unset binary/integer variables and set bounds
-    JuMP.unset_binary.(bin_vars)
-    bin_vars_not_fixed = (!).(JuMP.is_fixed.(bin_vars))
-    JuMP.set_upper_bound.(bin_vars[bin_vars_not_fixed], 1)
-    JuMP.set_lower_bound.(bin_vars[bin_vars_not_fixed], 0)
-    JuMP.unset_integer.(int_vars)
-
     if i != 1
+        _unset_integrality(optimizer, object)
+
         comp_vars = optimizer.comp_vars[object]
         var_copy_map = optimizer.var_copy_map[object]
         primal_iters = optimizer.primal_iters[object]
@@ -314,17 +332,15 @@ function _optimize_in_backward_pass(optimizer, i)
         # Fix primal solutions
         var_copies = [var_copy_map[var] for var in comp_vars]
         PlasmoBenders._fix_variables(object, var_copies, last_primals)
-    end
 
-    # Optimize the next node
-    t_solve = @elapsed optimize!(object)
-    optimizer.time_subproblem_solves += t_solve
+        # Optimize the next node
+        t_solve = @elapsed optimize!(object)
+        optimizer.time_subproblem_solves += t_solve
 
-    # Check termination status
-    object_termination_status = _check_termination_status(object, i; add_slacks_bool=get_add_slacks(optimizer), feasibility_cuts_bool=get_feasibility_cuts(optimizer))
+        # Check termination status
+        object_termination_status = _check_termination_status(object, i; add_slacks_bool=get_add_slacks(optimizer), feasibility_cuts_bool=get_feasibility_cuts(optimizer))
 
-    # If it's not the first node, save the dual and phi values
-    if i != 1
+        # Save the dual and phi values
         dual_iters = optimizer.dual_iters[object]
         next_duals = _get_next_duals(optimizer, object)
 
@@ -332,7 +348,7 @@ function _optimize_in_backward_pass(optimizer, i)
         var_copy_map = optimizer.var_copy_map[object]
 
         if object_termination_status
-            next_phi = JuMP.value(object, JuMP.objective_function(object))
+            next_phi = JuMP.objective_value(object)
             optimizer.feasibility_map[object] = true
         else
             println("Subgraph $i in backwards pass was infeasible; using feasibility_cuts")
@@ -349,16 +365,9 @@ function _optimize_in_backward_pass(optimizer, i)
 
         # Unfix primal solutions
         PlasmoBenders._unfix_variables(object, var_copies)
+
+        _reset_integrality(optimizer, object)
     end
-
-    # Reset binary/integer variables
-    bin_vars_with_lower_bound = JuMP.has_lower_bound.(bin_vars)
-    bin_vars_with_upper_bound = JuMP.has_upper_bound.(bin_vars)
-    JuMP.delete_lower_bound.(bin_vars[bin_vars_with_lower_bound])
-    JuMP.delete_upper_bound.(bin_vars[bin_vars_with_upper_bound])
-    JuMP.set_binary.(bin_vars)
-    JuMP.set_integer.(int_vars) #TODO: fix bounds on integer vars?
-
 
     if (get_sequential_backward_pass(optimizer) && haskey(optimizer.parent_objects, object)) && get_strengthened(optimizer)
         _solve_for_strengthened_cuts(optimizer, i - 1) #this function calls i + 1, so we subtract one here
@@ -371,10 +380,11 @@ end
 Add cuts to a given object
 """
 function _add_Benders_cut_to_object!(optimizer::BendersAlgorithm, last_object::G, next_objects::Vector{G}) where {G <: Plasmo.AbstractOptiGraph}
-    agg_rhs_expr = GenericAffExpr{Float64, Plasmo.NodeVariableRef}()
+    V = Plasmo.variable_type(last_object)
+    agg_rhs_expr = GenericAffExpr{Float64, V}()
 
     for (j, object) in enumerate(next_objects)
-        rhs_expr = GenericAffExpr{Float64, Plasmo.NodeVariableRef}()
+        rhs_expr = GenericAffExpr{Float64, V}()
         # Complicating variables are on previous object
         comp_vars = optimizer.comp_vars[object]
 
@@ -419,13 +429,14 @@ end
 Add cuts to a given object
 """
 function _add_strengthened_cut_to_object!(optimizer::BendersAlgorithm, last_object::G, next_objects::Vector{G}) where {G <: Plasmo.AbstractOptiGraph}
-    agg_rhs_expr = GenericAffExpr{Float64, Plasmo.NodeVariableRef}()
-    agg_rhs_expr_LR = GenericAffExpr{Float64, Plasmo.NodeVariableRef}()
+    V = Plasmo.variable_type(last_object)
+    agg_rhs_expr = GenericAffExpr{Float64, V}()
+    agg_rhs_expr_LR = GenericAffExpr{Float64, V}()
 
     for (j, object) in enumerate(next_objects)
         if optimizer.feasibility_map[object]
-            rhs_expr = GenericAffExpr{Float64, Plasmo.NodeVariableRef}()
-            rhs_expr_LR = GenericAffExpr{Float64, Plasmo.NodeVariableRef}()
+            rhs_expr = GenericAffExpr{Float64, V}()
+            rhs_expr_LR = GenericAffExpr{Float64, V}()
 
             # Complicating variables are on previous object
             comp_vars = optimizer.comp_vars[object]

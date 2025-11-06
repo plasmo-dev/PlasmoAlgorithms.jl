@@ -125,7 +125,7 @@ function test_DDP_MIP_initialization()
     end
 
     # Test API
-    @test get_graph(BendersAlg) == graph
+    @test PlasmoBenders.get_graph(BendersAlg) == graph
     @test get_root_object(BendersAlg) == subgraphs[1]
     @test get_max_iters(BendersAlg) == max_iters
     @test get_tol(BendersAlg) == tol
@@ -205,7 +205,7 @@ function test_DDP_MIP_initialization_remote()
     end
 
     # Test API
-    @test get_graph(BendersAlg) == rgraph
+    @test PlasmoBenders.get_graph(BendersAlg) == rgraph
     @test get_root_object(BendersAlg) == rsubgraphs[1]
     @test get_max_iters(BendersAlg) == max_iters
     @test get_tol(BendersAlg) == tol

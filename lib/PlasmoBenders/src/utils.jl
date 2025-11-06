@@ -23,31 +23,6 @@ end
 Base.print(io::IO, optimizer::BendersAlgorithm) = Base.print(io, Base.string(optimizer))
 Base.show(io::IO, optimizer::BendersAlgorithm) = Base.print(io, optimizer)
 
-# Enable printing the optimizer
-function Base.string(optimizer::BendersAlgorithm)
-    return return @sprintf(
-        """
-        A BendersAlgorithm
-        -------------------------------------------
-        %32s %9s
-        %32s %9s
-        %32s %9s
-        %32s %9s
-        """,
-        "Num subproblem subgraphs:",
-        length(optimizer.solve_order),
-        "MIP subproblems (nonroot):",
-        optimizer.is_MIP,
-        "Absolute Tolerance:",
-        optimizer.tol,
-        "Maximum Iterations:",
-        optimizer.max_iters,
-    )
-end
-
-Base.print(io::IO, optimizer::BendersAlgorithm) = Base.print(io, Base.string(optimizer))
-Base.show(io::IO, optimizer::BendersAlgorithm) = Base.print(io, optimizer)
-
 function _get_hyper_projection(optimizer::BendersAlgorithm, graph::Plasmo.OptiGraph)
     if haskey(optimizer.ext, "_projection")
         return optimizer.ext["_projection"]
@@ -627,4 +602,94 @@ function _unfix_variables(object::RemoteOptiGraph, variables::Vector{Plasmo.Remo
     end
 
     return fetch(f)
+end
+
+function _unset_integrality(optimizer::BendersAlgorithm{OptiGraph}, object::OptiGraph)
+    ### Unset binary/integer variables
+    bin_vars_dict = optimizer.binary_map[object]
+    int_vars_dict = optimizer.integer_map[object]
+
+    bin_vars = collect(keys(bin_vars_dict))
+    int_vars = collect(keys(int_vars_dict))
+
+    # Unset binary/integer variables and set bounds
+    JuMP.unset_binary.(bin_vars)
+    bin_vars_not_fixed = (!).(JuMP.is_fixed.(bin_vars))
+    JuMP.set_upper_bound.(bin_vars[bin_vars_not_fixed], 1)
+    JuMP.set_lower_bound.(bin_vars[bin_vars_not_fixed], 0)
+    JuMP.unset_integer.(int_vars)
+end
+
+function _unset_integrality(optimizer::BendersAlgorithm{RemoteOptiGraph}, object::RemoteOptiGraph)
+    ### Unset binary/integer variables
+    bin_vars_dict = optimizer.binary_map[object]
+    int_vars_dict = optimizer.integer_map[object]
+
+    bin_vars = collect(keys(bin_vars_dict))
+    int_vars = collect(keys(int_vars_dict))
+
+    bin_pvars = Plasmo._convert_remote_to_proxy(object, bin_vars)
+    int_pvars = Plasmo._convert_remote_to_proxy(object, int_vars)
+
+    darray = object.graph
+
+    f = @spawnat object.worker begin
+        lgraph = Plasmo.local_graph(darray)
+        bin_lvars = Plasmo._convert_proxy_to_local(lgraph, bin_pvars)
+        int_lvars = Plasmo._convert_proxy_to_local(lgraph, int_pvars)
+
+        # Unset binary/integer variables and set bounds
+        JuMP.unset_binary.(bin_lvars)
+        bin_vars_not_fixed = (!).(JuMP.is_fixed.(bin_lvars))
+        JuMP.set_upper_bound.(bin_vars[bin_vars_not_fixed], 1)
+        JuMP.set_lower_bound.(bin_vars[bin_vars_not_fixed], 0)
+        JuMP.unset_integer.(int_lvars)
+    end
+    return nothing
+end
+
+function _reset_integrality(optimizer::BendersAlgorithm{OptiGraph}, object::OptiGraph)
+    ### Unset binary/integer variables
+    bin_vars_dict = optimizer.binary_map[object]
+    int_vars_dict = optimizer.integer_map[object]
+
+    bin_vars = collect(keys(bin_vars_dict))
+    int_vars = collect(keys(int_vars_dict))
+
+    # Reset binary/integer variables
+    bin_vars_with_lower_bound = JuMP.has_lower_bound.(bin_vars)
+    bin_vars_with_upper_bound = JuMP.has_upper_bound.(bin_vars)
+    JuMP.delete_lower_bound.(bin_vars[bin_vars_with_lower_bound])
+    JuMP.delete_upper_bound.(bin_vars[bin_vars_with_upper_bound])
+    JuMP.set_binary.(bin_vars)
+    JuMP.set_integer.(int_vars) #TODO: fix bounds on integer vars?
+end
+
+function _reset_integrality(optimizer::BendersAlgorithm{RemoteOptiGraph}, object::RemoteOptiGraph)
+    ### Unset binary/integer variables
+    bin_vars_dict = optimizer.binary_map[object]
+    int_vars_dict = optimizer.integer_map[object]
+
+    bin_vars = collect(keys(bin_vars_dict))
+    int_vars = collect(keys(int_vars_dict))
+
+    bin_pvars = Plasmo._convert_remote_to_proxy(object, bin_vars)
+    int_pvars = Plasmo._convert_remote_to_proxy(object, int_vars)
+
+    darray = object.graph
+
+    f = @spawnat object.worker begin
+        lgraph = Plasmo.local_graph(darray)
+        bin_lvars = Plasmo._convert_proxy_to_local(lgraph, bin_pvars)
+        int_lvars = Plasmo._convert_proxy_to_local(lgraph, int_pvars)
+
+        # Reset binary/integer variables
+        bin_vars_with_lower_bound = JuMP.has_lower_bound.(bin_lvars)
+        bin_vars_with_upper_bound = JuMP.has_upper_bound.(bin_lvars)
+        JuMP.delete_lower_bound.(bin_lvars[bin_vars_with_lower_bound])
+        JuMP.delete_upper_bound.(bin_lvars[bin_vars_with_upper_bound])
+        JuMP.set_binary.(bin_lvars)
+        JuMP.set_integer.(int_lvars) #TODO: fix bounds on integer vars?
+    end
+    return nothing
 end
