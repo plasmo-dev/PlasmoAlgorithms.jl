@@ -8,7 +8,8 @@ on:
   pull_request:
 
 jobs:
-  build:
+  benders-docs:
+    name: Docs (PlasmoBenders)
     permissions:
       actions: write
       contents: write
@@ -19,12 +20,100 @@ jobs:
       - uses: actions/checkout@v4
       - uses: julia-actions/setup-julia@latest
         with:
-          version: '1.6'
+          version: '1.10'
       - uses: julia-actions/cache@v1
-      - name: Install dependencies
-        run: julia --project=docs/ docs/install.jl
-      - name: Build and deploy
+      - name: Install dependencies (PlasmoBenders)
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}     # If authenticating with GitHub Actions token
-          DOCUMENTER_KEY: ${{ secrets.DOCUMENTER_KEY }} # If authenticating with SSH deploy key
+          DOC_PKG: PlasmoBenders
+        run: julia --project=docs/ docs/install.jl
+      - name: Build and deploy (PlasmoBenders)
+        env:
+          DOC_PKG: PlasmoBenders
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DOCUMENTER_KEY: ${{ secrets.DOCUMENTER_KEY }}
         run: julia --project=docs/ docs/make.jl
+
+  schwarz-docs:
+    name: Docs (PlasmoSchwarz)
+    needs: benders-docs
+    permissions:
+      actions: write
+      contents: write
+      pull-requests: read
+      statuses: write
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: julia-actions/setup-julia@latest
+        with:
+          version: '1.10'
+      - uses: julia-actions/cache@v1
+      - name: Install dependencies (PlasmoSchwarz)
+        env:
+          DOC_PKG: PlasmoSchwarz
+        run: julia --project=docs/ docs/install.jl
+      - name: Build and deploy (PlasmoSchwarz)
+        env:
+          DOC_PKG: PlasmoSchwarz
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DOCUMENTER_KEY: ${{ secrets.DOCUMENTER_KEY }}
+        run: julia --project=docs/ docs/make.jl
+
+  docs-index:
+    name: Docs (index)
+    needs: [benders-docs, schwarz-docs]
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout gh-pages
+        uses: actions/checkout@v4
+        with:
+          ref: gh-pages
+          fetch-depth: 0
+      - name: Create dev index with links
+        run: |
+          mkdir -p dev
+          cat > dev/index.html <<'EOF'
+          <!doctype html>
+          <html lang="en">
+          <head>
+            <meta charset="utf-8" />
+            <meta name="viewport" content="width=device-width, initial-scale=1" />
+            <title>PlasmoAlgorithms.jl Docs</title>
+            <style>
+              body { font-family: -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; margin: 2rem; }
+              h1 { margin-bottom: 0.5rem; }
+              .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem; margin-top: 1rem; }
+              .card { border: 1px solid #e0e0e0; border-radius: 8px; padding: 1rem; }
+              a { text-decoration: none; color: #0059b3; font-weight: 600; }
+              small { color: #666; }
+            </style>
+          </head>
+          <body>
+            <h1>PlasmoAlgorithms.jl documentation</h1>
+            <p>Select a sub-package:</p>
+            <div class="cards">
+              <div class="card">
+                <a href="../benders/">PlasmoBenders</a>
+                <div><small>Decomposition via Benders</small></div>
+              </div>
+              <div class="card">
+                <a href="../schwarz/">PlasmoSchwarz</a>
+                <div><small>Domain decomposition (Schwarz)</small></div>
+              </div>
+            </div>
+          </body>
+          </html>
+          EOF
+      - name: Commit and push index
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add dev/index.html
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "Update docs dev index with links to benders and schwarz"
+            git push origin gh-pages
+          fi
