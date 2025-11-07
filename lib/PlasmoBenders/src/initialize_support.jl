@@ -1,16 +1,50 @@
+function _add_constraint_set_to_subproblem!(
+    optimizer::BendersAlgorithm{T}, 
+    cons::Vector{ConstraintRef}, 
+    next_object::T, 
+    node::N, 
+    comp_vars::Vector{V}, 
+    var_copy_map::Dict, 
+    link::Bool, 
+    slack::Bool
+) where {V <: JuMP.AbstractVariableRef, T <: Plasmo.AbstractOptiGraph, N <: Union{Plasmo.OptiNode, Plasmo.RemoteNodeRef}}
+    if get_add_slacks(optimizer)
+        slack_penalty = get_slack_penalty(optimizer)
+        _add_slack_to_node(optimizer, next_object, node, length(cons), slack_penalty)
+        for (j, con) in enumerate(cons)
+            con_obj = JuMP.constraint_object(con)
+            _add_constraint_to_subproblem!(con_obj, comp_vars, var_copy_map,
+                                          next_object, node, link; slack = slack,
+                                          slack_up = node[:_slack_up][j],
+                                          slack_down = node[:_slack_down][j]
+            )
+        end
+    else
+        for (j, con) in enumerate(cons)
+            con_obj = JuMP.constraint_object(con)
+            _add_constraint_to_subproblem!(con_obj, comp_vars, var_copy_map,
+                                          next_object, node, link; slack = slack,
+                                          slack_up = nothing,
+                                          slack_down = nothing
+            )
+        end
+    end
+    return nothing
+end
+
 function _add_constraint_to_subproblem!(
-    con_obj::ScalarConstraint{GenericAffExpr{Float64, Plasmo.NodeVariableRef}, MOI.LessThan{Float64}},#ConstraintRef{Plasmo.OptiEdge{Plasmo.OptiGraph}, MOI.ConstraintIndex{MOI.ScalarAffineFunction{Float64}, MOI.LessThan{Float64}}},
+    con_obj::ScalarConstraint{GenericAffExpr{Float64, V}, MOI.LessThan{Float64}},
     comp_vars,
     var_copy_map,
-    next_object::Plasmo.OptiGraph,
-    next_node::Plasmo.OptiNode,
+    next_object::T,
+    next_node::N,
     link::Bool;
     slack::Bool = false,
     slack_up = nothing,
     slack_down = nothing
-)
+) where {V <: JuMP.AbstractVariableRef, T <: Plasmo.AbstractOptiGraph, N <: Union{Plasmo.OptiNode, Plasmo.RemoteNodeRef}}
     # Create empty expression (for a constraint)
-    new_expr = GenericAffExpr{Float64, Plasmo.NodeVariableRef}()
+    new_expr = GenericAffExpr{Float64, V}()
 
     # Add variables or variable copy to the expression
     for (i, var) in enumerate(con_obj.func.terms.keys)
@@ -37,18 +71,18 @@ function _add_constraint_to_subproblem!(
 end
 
 function _add_constraint_to_subproblem!(
-    con_obj::ScalarConstraint{GenericAffExpr{Float64, Plasmo.NodeVariableRef}, MOI.EqualTo{Float64}},#ConstraintRef{Plasmo.OptiEdge{Plasmo.OptiGraph}, MOI.ConstraintIndex{MOI.ScalarAffineFunction{Float64}, MOI.EqualTo{Float64}}},
+    con_obj::ScalarConstraint{GenericAffExpr{Float64, V}, MOI.EqualTo{Float64}},
     comp_vars,
     var_copy_map,
-    next_object::Plasmo.OptiGraph,
-    next_node::Plasmo.OptiNode,
+    next_object::T,
+    next_node::N,
     link::Bool;
     slack::Bool = false,
     slack_up = nothing,
     slack_down = nothing
-)
+) where {V <: JuMP.AbstractVariableRef, T <: Plasmo.AbstractOptiGraph, N <: Union{Plasmo.OptiNode, Plasmo.RemoteNodeRef}}
     # Create empty expression (for a constraint)
-    new_expr = GenericAffExpr{Float64, Plasmo.NodeVariableRef}()
+    new_expr = GenericAffExpr{Float64, V}()
 
     # Add variables or variable copy to the expression
     for (i, var) in enumerate(con_obj.func.terms.keys)
@@ -75,18 +109,18 @@ function _add_constraint_to_subproblem!(
 end
 
 function _add_constraint_to_subproblem!(
-    con_obj::ScalarConstraint{GenericAffExpr{Float64, Plasmo.NodeVariableRef}, MOI.GreaterThan{Float64}},#ConstraintRef{Plasmo.OptiEdge{Plasmo.OptiGraph}, MOI.ConstraintIndex{MOI.ScalarAffineFunction{Float64}, MOI.GreaterThan{Float64}}},
+    con_obj::ScalarConstraint{GenericAffExpr{Float64, V}, MOI.GreaterThan{Float64}},
     comp_vars,
     var_copy_map,
-    next_object::Plasmo.OptiGraph,
-    next_node::Plasmo.OptiNode,
+    next_object::T,
+    next_node::N,
     link::Bool;
     slack::Bool = false,
     slack_up = nothing,
     slack_down = nothing
-)
+) where {V <: JuMP.AbstractVariableRef, T <: Plasmo.AbstractOptiGraph, N <: Union{Plasmo.OptiNode, Plasmo.RemoteNodeRef}}
     # Create empty expression (for a constraint)
-    new_expr = GenericAffExpr{Float64, Plasmo.NodeVariableRef}()
+    new_expr = GenericAffExpr{Float64, V}()
 
     # Add variables or variable copy to the expression
     for (i, var) in enumerate(con_obj.func.terms.keys)
@@ -112,31 +146,72 @@ function _add_constraint_to_subproblem!(
     end
 end
 
-# Define function to add theta to the objective
-function _add_theta_to_objective!(
-    obj_func::AffExpr,
-    node::Plasmo.OptiNode,
-    _theta::Vector{NodeVariableRef}
-)
-    for i in 1:length(_theta)
-        add_to_expression!(obj_func, _theta[i] * 1)
-    end
-    JuMP.set_objective_function(node, obj_func)
-
-end
-
-function _add_theta_to_objective!(
-    obj_func::NodeVariableRef,
-    node::Plasmo.OptiNode,
-    _theta::Vector{NodeVariableRef}
-)
-    obj_func = obj_func + sum(_theta[i] for i in 1:length(_theta))
-    JuMP.set_objective_function(node, obj_func)
-end
-
-function _set_theta_lower_bound!(object::Plasmo.OptiGraph, M)
+function _set_theta_lower_bound!(object::T, M) where {T <: Plasmo.AbstractOptiGraph}
     theta = object[:_theta_node][:_theta]
     for i in 1:length(theta)
         JuMP.set_lower_bound(object[:_theta_node][:_theta][i], M)
     end
+end
+
+function _build_comp_vars_copies(node::Plasmo.OptiNode, num_var_copies::Int)
+    return @variable(node, _comp_vars_copy[1:num_var_copies])
+end
+
+function _build_comp_vars_copies(rnode::Plasmo.RemoteNodeRef, num_var_copies::Int)
+    rgraph = rnode.remote_graph
+
+    darray = rgraph.graph
+    pnode = Plasmo._convert_remote_to_proxy(rgraph, rnode)
+    f = @spawnat rgraph.worker begin
+        lgraph = Plasmo.local_graph(darray)
+        lnode = Plasmo._convert_proxy_to_local(lgraph, pnode)
+        vars = @variable(lnode, _comp_vars_copy[1:num_var_copies])
+        [(var.index, Symbol(name(var))) for var in vars]
+    end
+    var_tuples = fetch(f)
+
+    vars = [Plasmo.RemoteVariableRef(rnode, t[1], t[2]) for t in var_tuples]
+    return vars
+end
+
+function _get_con_obj_var_sets(con_obj::ScalarConstraint{GenericAffExpr{Float64, V}, S}, next_object_nodes, last_object_nodes) where {V, S}
+    vars = con_obj.func.terms.keys
+
+    next_object_link_vars = [var for var in vars if JuMP.owner_model(var) in next_object_nodes]
+    last_object_link_vars = [var for var in vars if JuMP.owner_model(var) in last_object_nodes]
+
+    return vars, next_object_link_vars, last_object_link_vars
+end
+
+function _add_to_objective_function(object::OptiGraph, theta_sum::E) where {E<:Union{NodeVariableRef, GenericAffExpr}}
+    obj_func = objective_function(object)
+    if isa(obj_func, NodeVariableRef)
+        new_obj_func = GenericAffExpr{Float64, NodeVariableRef}()
+        add_to_expression!(new_obj_func, obj_func + theta_sum)
+        set_objective_function(lgraph, new_obj_func)
+    else
+        add_to_expression!(obj_func, theta_sum)
+        set_objective_function(object, obj_func)
+    end
+end
+
+function _add_to_objective_function(object::RemoteOptiGraph, theta_sum::E) where {E<:Union{RemoteVariableRef, GenericAffExpr}}
+    darray = object.graph
+    pexpr = Plasmo._convert_remote_to_proxy(object, theta_sum)
+
+    f = @spawnat object.worker begin
+        lgraph = Plasmo.local_graph(darray)
+        lexpr = Plasmo._convert_proxy_to_local(lgraph, pexpr)
+        obj_func = objective_function(lgraph)
+        if isa(obj_func, NodeVariableRef)
+            new_obj_func = GenericAffExpr{Float64, NodeVariableRef}()
+            add_to_expression!(new_obj_func, obj_func + lexpr)
+            set_objective_function(lgraph, new_obj_func)
+        else
+            add_to_expression!(obj_func, lexpr)
+            set_objective_function(lgraph, obj_func)
+        end
+        nothing
+    end
+    return fetch(f)
 end

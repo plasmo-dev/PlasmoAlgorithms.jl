@@ -37,46 +37,56 @@ function Plasmo.incident_edges(projection::T, subgraph::Plasmo.OptiGraph) where 
     return incident_edges(projection, all_nodes(subgraph))
 end
 
-function Plasmo.incident_edges(optimizer::BendersAlgorithm, graph::Plasmo.OptiGraph, subgraph::Plasmo.OptiGraph)
+function _get_incident_edges(optimizer::BendersAlgorithm, graph::Plasmo.OptiGraph, subgraph::Plasmo.OptiGraph)
+    projection = _get_hyper_projection(optimizer, graph)
+    edges = Plasmo.incident_edges(projection, subgraph)
+    optimizer.ext["incident_edges"][subgraph] = edges
+    return edges
+end
+
+function _get_incident_edges(optimizer::BendersAlgorithm, graph::Plasmo.RemoteOptiGraph, subgraph::Plasmo.RemoteOptiGraph)
+    edges = Plasmo.incident_edges(subgraph)
+    return edges
+end
+
+function Plasmo.incident_edges(optimizer::BendersAlgorithm, graph::T, subgraph::T) where {T <: Plasmo.AbstractOptiGraph}
     if haskey(optimizer.ext["incident_edges"], subgraph)
         return optimizer.ext["incident_edges"][subgraph]
     else
-        projection = _get_hyper_projection(optimizer, graph)
-        edges = Plasmo.incident_edges(projection, subgraph)
-        optimizer.ext["incident_edges"][subgraph] = edges
-        return edges
+        return _get_incident_edges(optimizer, graph, subgraph)
     end
 end
 
-function _theta_value(optimizer::BendersAlgorithm, object::Plasmo.OptiGraph)
+function _theta_value(optimizer::BendersAlgorithm, object::T) where {T <: Plasmo.AbstractOptiGraph}
     theta_var = optimizer.ext["theta_vars"][object]
     return sum(JuMP.value(object, theta) for theta in theta_var)
 end
 
-function _get_theta(optimizer::BendersAlgorithm, object::Plasmo.OptiGraph)
+function _get_theta(optimizer::BendersAlgorithm, object::T) where {T <: Plasmo.AbstractOptiGraph}
     return optimizer.ext["theta_vars"][object]
 end
 
-function _get_theta(optimizer::BendersAlgorithm, object::Plasmo.OptiGraph, idx::Int)
+function _get_theta(optimizer::BendersAlgorithm, object::T, idx::Int) where {T <: Plasmo.AbstractOptiGraph}
     return optimizer.ext["theta_vars"][object][idx]
 end
 
 # Define a function for getting the dual value of the linking constraints
-function _get_next_duals(optimizer::BendersAlgorithm, next_object::Plasmo.OptiGraph)
+function _get_next_duals(optimizer::BendersAlgorithm, next_object::T) where {T <: Plasmo.AbstractOptiGraph}
     var_copy_map = optimizer.var_copy_map[next_object]
     comp_vars = optimizer.comp_vars[next_object]
 
-    dual_vector = Float64[JuMP.dual(next_object, FixRef(var_copy_map[comp_vars[i]])) for i in 1:length(comp_vars)]
+    copy_vars = [var_copy_map[comp_vars[i]] for i in 1:length(comp_vars)]
+    dual_vector = _get_dual_vector(next_object, copy_vars)
     return dual_vector
 end
 
 # TODO: Need to improve the interface for getting values
 # Define function for getting the best solution from the optimizer
 function JuMP.value(
-    optimizer::BendersAlgorithm{Plasmo.OptiGraph},
-    var::NodeVariableRef,
-    object::Plasmo.OptiGraph
-)
+    optimizer::BendersAlgorithm{T},
+    var::V,
+    object::T
+) where {T <: Plasmo.AbstractOptiGraph, V <: JuMP.AbstractVariableRef}
     var_solution_map = optimizer.var_solution_map[object]
     # Get the variable index for the variable on the node
     var_index = var_solution_map[var]
@@ -90,12 +100,12 @@ function JuMP.value(
 end
 
 """
-    JuMP.value(opt::BendersAlgorithm, var::NodeVariableRef)
+    JuMP.value(opt::BendersAlgorithm, var::VariableRef)
     
 Returns the value of `var` from the BendersAlgorithm object. The value corresponds to the
 best upper bound of the optimizer.
 """
-function JuMP.value(optimizer::BendersAlgorithm, var::NodeVariableRef)
+function JuMP.value(optimizer::BendersAlgorithm, var::V) where {V <: JuMP.AbstractVariableRef}
     best_solutions = optimizer.best_solutions
     var_solution_map = optimizer.var_solution_map
     var_to_graph_map = optimizer.var_to_graph_map
@@ -113,12 +123,12 @@ function JuMP.value(optimizer::BendersAlgorithm, var::NodeVariableRef)
 end
 
 """
-    JuMP.value(opt::BendersAlgorithm, vars::Vector{NodeVariableRef})
+    JuMP.value(opt::BendersAlgorithm, vars::Vector{VariableRef})
     
 Returns a vector of variables contained in the `vars` vector from the BendersAlgorithm
 object. The values correspond to the best upper bound of the optimizer.
 """
-function JuMP.value(optimizer::BendersAlgorithm, vars::Vector{NodeVariableRef})
+function JuMP.value(optimizer::BendersAlgorithm, vars::Vector{V}) where {V <: JuMP.AbstractVariableRef}
     best_solutions = optimizer.best_solutions
     var_solution_map = optimizer.var_solution_map
     var_to_graph_map = optimizer.var_to_graph_map
@@ -168,7 +178,7 @@ function relative_gap(optimizer::BendersAlgorithm)
 end
 
 # Define function for warm starting
-function _warm_start(optimizer::BendersAlgorithm, object)
+function _warm_start(optimizer::BendersAlgorithm{Plasmo.OptiGraph}, object::Plasmo.OptiGraph)
     all_vars = all_variables(object)
     all_vals = optimizer.best_solutions[object]
 
@@ -178,16 +188,27 @@ function _warm_start(optimizer::BendersAlgorithm, object)
     end
 end
 
+function _warm_start(optimizer::BendersAlgorithm{Plasmo.RemoteOptiGraph}, object::Plasmo.RemoteOptiGraph)
+    all_vals = optimizer.best_solutions[object]
+    darray = optimizer.graph.graph
+
+    f = @spawnat object.worker begin
+        lg = Plasmo.local_graph(darray)
+        all_vars = all_variables(lg)
+        JuMP.set_start_value.(all_vars, all_vals)
+    end
+end
+
 # Define functions for adding slacks, and adding them to the objectives
-function _add_slack_to_node(optimizer::BendersAlgorithm, next_object, node::Plasmo.OptiNode, num_links, slack_penalty)
+function _add_slack_to_node(optimizer::BendersAlgorithm, next_object, node::N, num_links, slack_penalty) where {N <: Union{Plasmo.OptiNode, Plasmo.RemoteNodeRef}}
     # Define slack variables
     @variable(node, _slack_up[1:num_links] >= 0)
     @variable(node, _slack_down[1:num_links] >= 0)
-
+    V = Plasmo.variable_type(optimizer.graph)
     slack_vars_dict = optimizer.slack_vars
 
     if !(haskey(slack_vars_dict, next_object))
-        slack_vars_dict[next_object] = NodeVariableRef[]
+        slack_vars_dict[next_object] = V[]
     end
 
     for var in _slack_up
@@ -197,28 +218,33 @@ function _add_slack_to_node(optimizer::BendersAlgorithm, next_object, node::Plas
         push!(slack_vars_dict[next_object], var)
     end
 
-    # Get the objective function
-    obj_func = objective_function(node)
+    slack_expr = sum(slack_penalty * (_slack_up[i] + _slack_down[i]) for i in 1:num_links)
 
-    # Ensure the objective is an Affine Expression
-    if typeof(obj_func) == NodeVariableRef
-        obj_func = GenericAffExpr{Float64, Plasmo.NodeVariableRef}(0, obj_func => 1)
-    elseif typeof(obj_func) == Nothing
-        obj_func = GenericAffExpr{Float64, Plasmo.NodeVariableRef}()
-    end
+    _add_to_objective_function(next_object, slack_expr)
 
-    # Add the slacks to the objective function
-    for i in 1:num_links
-        JuMP.add_to_expression!(obj_func, slack_penalty * _slack_up[i])
-        JuMP.add_to_expression!(obj_func, slack_penalty * _slack_down[i])
-    end
+    # # Get the objective function
+    # obj_func = objective_function(node)
 
-    # Reset the objective so it has the slacks
-    #JuMP.set_objective_function(node, obj_func)
-    @objective(node, Min, obj_func)
+    # # Ensure the objective is an Affine Expression
+    # if isa(obj_func, V)
+    #     obj_func = GenericAffExpr{Float64, V}(0, obj_func => 1)
+    # elseif typeof(obj_func) == nothing
+    #     obj_func = GenericAffExpr{Float64, V}()
+    # end
+
+    # # Add the slacks to the objective function
+    # for i in 1:num_links
+    #     JuMP.add_to_expression!(obj_func, slack_penalty * _slack_up[i])
+    #     JuMP.add_to_expression!(obj_func, slack_penalty * _slack_down[i])
+    # end
+
+    # # Reset the objective so it has the slacks
+    # #JuMP.set_objective_function(node, obj_func)
+    # @objective(node, Min, obj_func)
 end
 
-function _add_slack_to_node_for_links(optimizer::BendersAlgorithm, next_object::Plasmo.OptiGraph, node::Plasmo.OptiNode, num_links, slack_penalty)
+function _add_slack_to_node_for_links(optimizer::BendersAlgorithm, next_object::T, node::N, num_links, slack_penalty) where {T <: Plasmo.AbstractOptiGraph, N <: Union{Plasmo.OptiNode, Plasmo.RemoteNodeRef}}
+    V = Plasmo.variable_type(optimizer.graph)
     # Define slack variables
     @variable(node, _slack_up_link[1:num_links] >= 0)
     @variable(node, _slack_down_link[1:num_links] >= 0)
@@ -226,7 +252,7 @@ function _add_slack_to_node_for_links(optimizer::BendersAlgorithm, next_object::
     slack_vars_dict = optimizer.slack_vars
 
     if !(haskey(slack_vars_dict, next_object))
-        slack_vars_dict[next_object] = NodeVariableRef[]
+        slack_vars_dict[next_object] = V[]
     end
 
     for var in _slack_up_link
@@ -236,30 +262,34 @@ function _add_slack_to_node_for_links(optimizer::BendersAlgorithm, next_object::
         push!(slack_vars_dict[next_object], var)
     end
 
-    # Get the objective function
-    obj_func = objective_function(node)
+    slack_expr = sum(slack_penalty * (_slack_up_link[i] + _slack_down_link[i]) for i in 1:num_links)
 
-    # Ensure the objective is an Affine Expression
-    if typeof(obj_func) == NodeVariableRef
-        obj_func = GenericAffExpr{Float64, Plasmo.NodeVariableRef}(0, obj_func => 1)
-    elseif typeof(obj_func) == Nothing
-        obj_func = GenericAffExpr{Float64, Plasmo.NodeVariableRef}()
-    end
+    _add_to_objective_function(next_object, slack_expr)
 
-    # Add the slacks to the objective function
-    for i in 1:num_links
-        JuMP.add_to_expression!(obj_func, slack_penalty * _slack_up_link[i])
-        JuMP.add_to_expression!(obj_func, slack_penalty * _slack_down_link[i])
-    end
+    # # Get the objective function
+    # obj_func = objective_function(node)
 
-    # Reset the objective so it has the slacks
-    #JuMP.set_objective_function(node, obj_func)
-    @objective(node, Min, obj_func)
+    # # Ensure the objective is an Affine Expression
+    # if isa(obj_func, V)
+    #     obj_func = GenericAffExpr{Float64, V}(0, obj_func => 1)
+    # elseif isnothing(obj_func)
+    #     obj_func = GenericAffExpr{Float64, V}()
+    # end
+
+    # # Add the slacks to the objective function
+    # for i in 1:num_links
+    #     JuMP.add_to_expression!(obj_func, slack_penalty * _slack_up_link[i])
+    #     JuMP.add_to_expression!(obj_func, slack_penalty * _slack_down_link[i])
+    # end
+
+    # # Reset the objective so it has the slacks
+    # #JuMP.set_objective_function(node, obj_func)
+    # @objective(node, Min, obj_func)
 
 end
 
 # Test if the problem is a MIP
-function _set_is_MIP(optimizer::BendersAlgorithm)
+function _set_is_MIP(optimizer::BendersAlgorithm{Plasmo.OptiGraph})
     graph = optimizer.graph
 
     graph_vars = setdiff(JuMP.all_variables(graph), JuMP.all_variables(optimizer.root_object))
@@ -274,46 +304,57 @@ function _set_is_MIP(optimizer::BendersAlgorithm)
     return nothing
 end
 
-function _get_objects(optimizer::BendersAlgorithm{Plasmo.OptiGraph})
+# Test if the problem is a MIP
+function _set_is_MIP(optimizer::BendersAlgorithm{Plasmo.RemoteOptiGraph})
+    graph = optimizer.graph
+
+    subgraphs = graph.subgraphs
+    root_object = optimizer.root_object
+    subgraphs = setdiff(subgraphs, [root_object])
+    for g in subgraphs
+        if PlasmoBenders._check_is_MIP(g)
+            optimizer.is_MIP = true
+            return nothing
+        end
+    end
+    optimizer.is_MIP = false
+    return nothing
+end
+
+function _check_is_MIP(rgraph::Plasmo.RemoteOptiGraph)
+    darray = rgraph.graph
+    f = @spawnat rgraph.worker begin
+        lg = Plasmo.local_graph(darray)
+        vars = all_variables(lg)
+        bool_val = any(JuMP.is_binary.(vars)) || any(JuMP.is_integer.(vars))
+        bool_val
+    end
+    return fetch(f)
+end
+
+function _get_objects(optimizer::BendersAlgorithm{T}) where {T <: Plasmo.AbstractOptiGraph}
     return local_subgraphs(optimizer.graph)
 end
 
-function _get_objects(graph::Plasmo.OptiGraph)
+function _get_objects(graph::T) where {T <: Plasmo.AbstractOptiGraph}
     return local_subgraphs(graph)
 end
 
-function _check_termination_status(optimizer::BendersAlgorithm, object, count)
+function _check_termination_status(object, count; add_slacks_bool::Bool=false, feasibility_cuts_bool::Bool=false)
     if termination_status(object) == MOI.INFEASIBLE
-        if get_add_slacks(optimizer)
-            if haskey(optimizer.slack_vars, object)
-                slack_vars = optimizer.slack_vars[object]
-                if !(get_fix_slacks(optimizer))
-                    error("Model on node/graph $count is infeasible; `add_slacks` is true, but the model is still infeasible!")
-                else
-                    for var in slack_vars
-                        JuMP.unfix(var)
-                        JuMP.set_lower_bound(var, 0)
-                    end
-                    @warn("Model on node/graph $count is infeasible; unfixing slack variables")
-
-                    optimize!(object)
-
-                    if termination_status(object) != MOI.OPTIMAL
-                        error("Model on node/graph $count still did not reach optimal solution; status = $(termination_status(object))")
-                    end
-                end
-            else
-                error("Model on node/graph $count is infeasible; `add_slacks` is true, but there are not slacks to unfix!")
-            end
-        elseif get_feasibility_cuts(optimizer) && count != 1
+        if add_slacks_bool
+            error("Model on graph $count is infeasible even though `add_slacks` is true. This should not happen. Check problem data or open an issue for PlasmoBenders")
+        elseif feasibility_cuts_bool && count != 1
             return false
         else
-            error("Model on node/graph $count is infeasible")
+            error("Model on graph $count is infeasible")
         end
     elseif termination_status(object) == MOI.INFEASIBLE_OR_UNBOUNDED
-        error("Model on node/graph $count is unbounded or infeasible")
+        error("Model on graph $count is unbounded or infeasible")
+    elseif termination_status(object) == MOI.TIME_LIMIT
+        @warn "Model on graph $count timed out"
     elseif (termination_status(object) != MOI.OPTIMAL) && (termination_status(object) != MOI.LOCALLY_SOLVED)
-        error("Model on node/graph $count terminated with status $(termination_status(object))")
+        error("Model on graph $count terminated with status $(termination_status(object))")
     end
     return true
 end
@@ -332,21 +373,6 @@ function JuMP.objective_value(optimizer::BendersAlgorithm, object, last_obj::Boo
         end
     else
         return JuMP.objective_value(object)
-    end
-end
-
-function _check_fixed_slacks!(optimizer::BendersAlgorithm, object)
-    if get_add_slacks(optimizer)
-        if get_fix_slacks(optimizer)
-            slack_vars = optimizer.slack_vars
-            if haskey(slack_vars, object)
-                if !(JuMP.is_fixed(slack_vars[object][1]))
-                    for var in slack_vars[object]
-                        JuMP.fix(var, 0, force = true)
-                    end
-                end
-            end
-        end
     end
 end
 
@@ -381,7 +407,6 @@ _options_bool_fields = [
     :parallelize_forward,
     :parallelize_backward,
     :add_slacks,
-    :fix_slacks,
     :warm_start,
     :relaxed_init_cuts
 ]
@@ -402,6 +427,8 @@ _algorithm_fields = [
     :time_backward_pass,
     :time_init,
     :time_iterations,
+    :time_root_problem_solve,
+    :time_subproblem_solves,
     :lower_bounds,
 ]
 
@@ -468,4 +495,201 @@ for field in _options_real_fields
         $method(optimizer::BendersAlgorithm, val::Real) = optimizer.options.$field = val
     end
     @eval export $method
+end
+
+function _get_binary_bool_vector(object::RemoteOptiGraph)
+    darray = object.graph
+    f = @spawnat object.worker begin
+        lg = Plasmo.local_graph(darray)
+        PlasmoBenders._get_binary_bool_vector(lg)
+    end
+    return fetch(f)
+end
+
+function _get_integer_bool_vector(object::RemoteOptiGraph)
+    darray = object.graph
+    f = @spawnat object.worker begin
+        lg = Plasmo.local_graph(darray)
+        PlasmoBenders._get_integer_bool_vector(lg)
+    end
+    return fetch(f)
+end
+
+function _get_binary_bool_vector(object::OptiGraph)
+    all_vars = all_variables(object)
+    return JuMP.is_binary.(all_vars)
+end
+
+function _get_integer_bool_vector(object::OptiGraph)
+    all_vars = all_variables(object)
+    return JuMP.is_integer.(all_vars)
+end
+
+function _get_object_last_solutions(object::OptiGraph)
+    vars = JuMP.all_variables(object)
+    return [JuMP.value(object, var) for var in vars]
+end
+
+function _get_object_last_solutions(object::RemoteOptiGraph)
+    darray = object.graph
+    f = @spawnat object.worker begin
+        lg = Plasmo.local_graph(darray)
+        PlasmoBenders._get_object_last_solutions(lg)
+    end
+    return fetch(f)
+end
+
+function _get_variable_values(object::OptiGraph, variables::Vector{Plasmo.NodeVariableRef})
+    return [value(object, var) for var in variables]
+end
+
+function _get_variable_values(object::RemoteOptiGraph, variables::Vector{Plasmo.RemoteVariableRef})
+    darray = object.graph
+    pvars = [Plasmo._convert_remote_to_proxy(object, var) for var in variables]
+    f = @spawnat object.worker begin
+        lg = Plasmo.local_graph(darray)
+        lvars = [Plasmo._convert_proxy_to_local(lg, var) for var in pvars]
+        PlasmoBenders._get_variable_values(lg, lvars)
+    end
+    return fetch(f)
+end
+
+function _get_dual_vector(object::OptiGraph, variables::Vector{Plasmo.NodeVariableRef})
+    return Float64[JuMP.dual(object, FixRef(var)) for var in variables]
+end
+
+function _get_dual_vector(object::RemoteOptiGraph, variables::Vector{Plasmo.RemoteVariableRef})
+    darray = object.graph
+    pvars = [Plasmo._convert_remote_to_proxy(object, var) for var in variables]
+    f = @spawnat object.worker begin
+        lg = Plasmo.local_graph(darray)
+        lvars = [Plasmo._convert_proxy_to_local(lg, var) for var in pvars]
+        PlasmoBenders._get_dual_vector(lg, lvars)
+    end
+    return fetch(f)
+end
+
+function _fix_variables(object::OptiGraph, variables::Vector{Plasmo.NodeVariableRef}, values::Vector{Float64})
+    JuMP.fix.(variables, values, force = true)
+end
+
+function _fix_variables(object::RemoteOptiGraph, variables::Vector{Plasmo.RemoteVariableRef}, values::Vector{Float64})
+    darray = object.graph
+    pvars = [Plasmo._convert_remote_to_proxy(object, var) for var in variables]
+    f = @spawnat object.worker begin
+        lg = Plasmo.local_graph(darray)
+        lvars = [Plasmo._convert_proxy_to_local(lg, var) for var in pvars]
+
+        PlasmoBenders._fix_variables(lg, lvars, values)
+        nothing
+    end
+    return fetch(f)
+end
+
+function _unfix_variables(object::OptiGraph, variables::Vector{Plasmo.NodeVariableRef})
+    JuMP.unfix.(variables)
+end
+
+function _unfix_variables(object::RemoteOptiGraph, variables::Vector{Plasmo.RemoteVariableRef})
+    darray = object.graph
+    pvars = [Plasmo._convert_remote_to_proxy(object, var) for var in variables]
+    f = @spawnat object.worker begin
+        lg = Plasmo.local_graph(darray)
+        lvars = [Plasmo._convert_proxy_to_local(lg, var) for var in pvars]
+
+        PlasmoBenders._unfix_variables(lg, lvars)
+        nothing
+    end
+
+    return fetch(f)
+end
+
+function _unset_integrality(optimizer::BendersAlgorithm{OptiGraph}, object::OptiGraph)
+    ### Unset binary/integer variables
+    bin_vars_dict = optimizer.binary_map[object]
+    int_vars_dict = optimizer.integer_map[object]
+
+    bin_vars = collect(keys(bin_vars_dict))
+    int_vars = collect(keys(int_vars_dict))
+
+    # Unset binary/integer variables and set bounds
+    JuMP.unset_binary.(bin_vars)
+    bin_vars_not_fixed = (!).(JuMP.is_fixed.(bin_vars))
+    JuMP.set_upper_bound.(bin_vars[bin_vars_not_fixed], 1)
+    JuMP.set_lower_bound.(bin_vars[bin_vars_not_fixed], 0)
+    JuMP.unset_integer.(int_vars)
+end
+
+function _unset_integrality(optimizer::BendersAlgorithm{RemoteOptiGraph}, object::RemoteOptiGraph)
+    ### Unset binary/integer variables
+    bin_vars_dict = optimizer.binary_map[object]
+    int_vars_dict = optimizer.integer_map[object]
+
+    bin_vars = collect(keys(bin_vars_dict))
+    int_vars = collect(keys(int_vars_dict))
+
+    bin_pvars = Plasmo._convert_remote_to_proxy(object, bin_vars)
+    int_pvars = Plasmo._convert_remote_to_proxy(object, int_vars)
+
+    darray = object.graph
+
+    f = @spawnat object.worker begin
+        lgraph = Plasmo.local_graph(darray)
+        bin_lvars = Plasmo._convert_proxy_to_local(lgraph, bin_pvars)
+        int_lvars = Plasmo._convert_proxy_to_local(lgraph, int_pvars)
+
+        # Unset binary/integer variables and set bounds
+        JuMP.unset_binary.(bin_lvars)
+        bin_vars_not_fixed = (!).(JuMP.is_fixed.(bin_lvars))
+        JuMP.set_upper_bound.(bin_vars[bin_vars_not_fixed], 1)
+        JuMP.set_lower_bound.(bin_vars[bin_vars_not_fixed], 0)
+        JuMP.unset_integer.(int_lvars)
+    end
+    return nothing
+end
+
+function _reset_integrality(optimizer::BendersAlgorithm{OptiGraph}, object::OptiGraph)
+    ### Unset binary/integer variables
+    bin_vars_dict = optimizer.binary_map[object]
+    int_vars_dict = optimizer.integer_map[object]
+
+    bin_vars = collect(keys(bin_vars_dict))
+    int_vars = collect(keys(int_vars_dict))
+
+    # Reset binary/integer variables
+    bin_vars_with_lower_bound = JuMP.has_lower_bound.(bin_vars)
+    bin_vars_with_upper_bound = JuMP.has_upper_bound.(bin_vars)
+    JuMP.delete_lower_bound.(bin_vars[bin_vars_with_lower_bound])
+    JuMP.delete_upper_bound.(bin_vars[bin_vars_with_upper_bound])
+    JuMP.set_binary.(bin_vars)
+    JuMP.set_integer.(int_vars) #TODO: fix bounds on integer vars?
+end
+
+function _reset_integrality(optimizer::BendersAlgorithm{RemoteOptiGraph}, object::RemoteOptiGraph)
+    ### Unset binary/integer variables
+    bin_vars_dict = optimizer.binary_map[object]
+    int_vars_dict = optimizer.integer_map[object]
+
+    bin_vars = collect(keys(bin_vars_dict))
+    int_vars = collect(keys(int_vars_dict))
+
+    bin_pvars = Plasmo._convert_remote_to_proxy(object, bin_vars)
+    int_pvars = Plasmo._convert_remote_to_proxy(object, int_vars)
+
+    darray = object.graph
+
+    f = @spawnat object.worker begin
+        lgraph = Plasmo.local_graph(darray)
+        bin_lvars = Plasmo._convert_proxy_to_local(lgraph, bin_pvars)
+        int_lvars = Plasmo._convert_proxy_to_local(lgraph, int_pvars)
+
+        # Reset binary/integer variables
+        bin_vars_with_lower_bound = JuMP.has_lower_bound.(bin_lvars)
+        bin_vars_with_upper_bound = JuMP.has_upper_bound.(bin_lvars)
+        JuMP.delete_lower_bound.(bin_lvars[bin_vars_with_lower_bound])
+        JuMP.delete_upper_bound.(bin_lvars[bin_vars_with_upper_bound])
+        JuMP.set_binary.(bin_lvars)
+        JuMP.set_integer.(int_lvars) #TODO: fix bounds on integer vars?
+    end
+    return nothing
 end

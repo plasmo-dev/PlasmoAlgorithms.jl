@@ -11,7 +11,6 @@ PlasmoBenders supports several different solver options. These are keyword argum
  * `parallelize_backward::Bool` - Whether to parallelize the backwards pass.
  * `add_slacks::Bool` - Whether to add slack variables to the linking constraint that is enforced on the downstream problem. This helps ensure recourse to the subproblems.
  * `slack_penalty::Real` - THe value of the penalty term used on the slack variables added to the linking constraints. 
- * `fix_slacks::Bool` - An experimental option where slack variables are fixed until a problem is infeasible, in which case, the slack variables are allowed to be unfixed to make the problem feasible. THere are no convergence guarantees on this approach.
  * `warm_start::Bool` - Whether to warm start the problems with the best solution that the solver has found so far. Cannot be true if `regularize=true`. 
  * `relaxed_init_cuts::Bool` - Whether to add initial cuts from a full problem relaxation. For MILP problems, initial cuts can be added by relaxing all integer variables and solving the full problem, and using the resulting primal/dual information to form cutting planes. See [Lara](https://www.sciencedirect.com/science/article/pii/S0377221718304466).
  * `max_iters::Int` - The maximum number of iterations to use before termination.
@@ -19,6 +18,7 @@ PlasmoBenders supports several different solver options. These are keyword argum
  * `solver` - The subproblem solver to use. If this is not set, it will assume that the user has set a solver on all subgraphs. 
  * `M::Real` - Lower bound on all cost-to-go variables. Default value is $0$. At the first iteration of the BD and Nested Benders Decomposition, theta is otherwise unconstrained, so this value ensures that the cost-to-variable is bounded. 
  * `is_MIP::Bool` - Whether the problem includes mixed integer variables in the subproblems. If the user does not set this value, the `BendersAlgorithm` constructor will detect this value by testing all subgraphs that are not the root subgraph (note that the root subgraph can have mixed integer variables and still set `is_MIP` to `false`). This argument determines when the backward pass occurs. For LPs, the backward pass can occur at the same time as the forward pass, but for MILPs, the backward pass is performed separately (and can be parallelized). 
+ * `set_graph_objectives_from_nodes` - Whether to call `set_to_node_objectives` on each subgraph. Doing so will use the node objectives for all subgraphs.
  
 !!! note
     If the objective value of a subproblem can be negative, it is important to set `M` to be less than zero. Otherwise, you can get lower bounds that are greater than upper bounds and the algorithm will not work. 
@@ -28,7 +28,7 @@ The `run_algorithm!` solves a `BendersAlgorithm` object. There are two additiona
  * `run_gc::Bool` - Whether to run the garbage collector at the end of each iteration. Could potentially help with some memory issues. 
  
 ## Two-Stage Problem Implementations
-Some solver options are only implemented for two-stage problems (what could be considered "traditional" Benders problems). These include `parallelize_benders`, `regularize`, and `feasibility_cuts`. Future development can include extending these to problems with three or more stages. 
-    
+Some solver options are only implemented for two-stage problems (what could be considered "traditional" Benders problems). These include `parallelize_benders`, `regularize`, and `feasibility_cuts`. Future development can include extending these to problems with three or more stages.
+
 ## Reporting Issues
 If you encounter issues with PlasmoBenders, please open issues on Github's [issue tracker](https://github.com/plasmo-dev/PlasmoAlgorithms.jl/issues). 

@@ -3,6 +3,7 @@ using Plasmo
 using JuMP
 using MathOptInterface
 using Printf
+using Distributed
 
 const PB = PlasmoBenders
 const MOI = MathOptInterface

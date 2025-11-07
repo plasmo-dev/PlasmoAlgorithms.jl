@@ -37,8 +37,8 @@ using Random, Distributions
 t = 0:1:30
 
 Random.seed!(10)
-cost1 = sin.(x .* 2 .* pi ./ 10 ) .* 2 .+ 10 .+ rand(Uniform(-1,1),31) .* .5
-demand1 = sin.(x .* 2 .* pi ./ 15 ) .* 30 .+ 100 .+ rand(Uniform(-1,1),31) .* 5
+cost1 = sin.(t .* 2 .* pi ./ 10 ) .* 2 .+ 10 .+ rand(Uniform(-1,1),31) .* .5
+demand1 = sin.(t .* 2 .* pi ./ 15 ) .* 30 .+ 100 .+ rand(Uniform(-1,1),31) .* 5
 ```
 
 The resulting data can be visualized as shown below: 

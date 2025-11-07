@@ -1,44 +1,40 @@
-function _init_ext!(optimizer::BendersAlgorithm{Plasmo.OptiGraph})
+function _init_ext!(optimizer::BendersAlgorithm{T, V}) where {T <: Plasmo.AbstractOptiGraph, V <: JuMP.AbstractVariableRef}
     graph = optimizer.graph
     subgraphs = local_subgraphs(graph)
 
+    N = Plasmo.node_type(graph)
     # Define mappings for variables and nodes to their subgraph
-    var_to_graph_map = Dict{NodeVariableRef, Plasmo.OptiGraph}()
-    node_to_graph_map = Dict{Plasmo.OptiNode, Plasmo.OptiGraph}()
+    var_to_graph_map = Dict{V, T}()
+    node_to_graph_map = Dict{N, T}()
 
     # Build mappings
     for (i, g) in enumerate(subgraphs)
-        vars = JuMP.all_variables(g)
-        for (j, var) in enumerate(vars)
-            var_to_graph_map[var] = g
-        end
-
         nodes = all_nodes(g)
         for (j, node) in enumerate(nodes)
             node_to_graph_map[node] = g
         end
     end
 
+    E = Plasmo.edge_type(graph)
+
     # Save mappings to the optimizer object
-    optimizer.ext["var_to_graph"] = var_to_graph_map #TODO: Make a new structure
     optimizer.ext["node_to_graph"] = node_to_graph_map
-    optimizer.ext["theta_vars"] = Dict{Plasmo.OptiGraph, Vector{NodeVariableRef}}()
+    optimizer.ext["theta_vars"] = Dict{T, Vector{V}}()
     optimizer.ext["is_overlapped"] = false
-    optimizer.ext["incident_edges"] = Dict{Plasmo.OptiGraph, Vector{Plasmo.OptiEdge}}()
+    optimizer.ext["incident_edges"] = Dict{T, Vector{E}}()
 
     return nothing
 end
 
-function _add_second_object!(optimizer::BendersAlgorithm{Plasmo.OptiGraph}, relaxed)
+function _add_second_object!(optimizer::BendersAlgorithm{T, V}, relaxed) where {T <: Plasmo.AbstractOptiGraph, V <: JuMP.AbstractVariableRef}
     graph = optimizer.graph
     root_object = optimizer.root_object
     parent_objects = optimizer.parent_objects
     solve_order_dict = optimizer.solve_order_dict
 
-    var_to_graph_map = optimizer.ext["var_to_graph"]
     node_to_graph_map = optimizer.ext["node_to_graph"]
 
-    optimizer.ext["search_next"] = Vector{typeof(root_object)}()
+    optimizer.ext["search_next"] = Vector{T}()
 
     # Get all nodes in the start object
     start_nodes = all_nodes(root_object)
@@ -79,10 +75,10 @@ function _add_second_object!(optimizer::BendersAlgorithm{Plasmo.OptiGraph}, rela
 end
 
 function _add_cost_to_go!(
-    optimizer::BendersAlgorithm{Plasmo.OptiGraph},
-    last_object::Plasmo.OptiGraph,
+    optimizer::BendersAlgorithm{T, V},
+    last_object::T,
     relaxed::Bool
-)
+) where {T <: Plasmo.AbstractOptiGraph, V <: JuMP.AbstractVariableRef}
     num_thetas = length(optimizer.solve_order_dict[last_object])
 
     # Define a new node on the subgraph and add theta to that node
@@ -93,6 +89,7 @@ function _add_cost_to_go!(
     theta_sum = sum(_theta[i] for i in 1:num_thetas)
     @objective(last_object[:_theta_node], Min, theta_sum)
 
+    _add_to_objective_function(last_object, theta_sum)
     # If the initial relaxation is not being solved, set lower bound as M
     if !relaxed || !(optimizer.is_MIP)
         for i in 1:num_thetas
@@ -108,49 +105,46 @@ function _add_cost_to_go!(
 end
 
 function _add_complicating_variables!(
-    optimizer::BendersAlgorithm{Plasmo.OptiGraph},
-    last_object::Plasmo.OptiGraph,
-    next_object::Plasmo.OptiGraph,
+    optimizer::BendersAlgorithm{T, V},
+    last_object::T,
+    next_object::T,
     add_slacks::Bool,
     slack_penalty::Real
-)
+) where {T <: Plasmo.AbstractOptiGraph, V <: JuMP.AbstractVariableRef}
     graph = optimizer.graph
     last_nodes = all_nodes(last_object)
     next_nodes = all_nodes(next_object)
-
-    last_object_vars = all_variables(last_object)
-    next_object_vars = all_variables(next_object)
 
     # Get incident edges between last and next objects
     last_object_optiedges = Plasmo.incident_edges(optimizer, graph, last_object)
     next_object_optiedges = Plasmo.incident_edges(optimizer, graph, next_object)
 
     complicating_edges = [e for e in next_object_optiedges if e in last_object_optiedges]
-    comp_vars = NodeVariableRef[]
+    comp_vars = Vector{V}()
+
+    N = Plasmo.node_type(graph)
 
     # Map complicating variables to their owning node and vice versa
-    node_to_var = Dict{Plasmo.OptiNode, Vector{NodeVariableRef}}()
-    var_to_node = Dict{NodeVariableRef, Plasmo.OptiNode}()
-
+    node_to_var = Dict{N, Vector{V}}()
+    var_to_node = Dict{V, N}()
     # Loop through each edge
     for (i, edge) in enumerate(complicating_edges)
         # Loop through each linkref on each edge
+        next_object_nodes = all_nodes(next_object)
+        last_object_nodes = all_nodes(last_object)
+
         for (j, link) in enumerate(all_constraints(edge))
 
-            con_obj = constraint_object(link)
-            vars = con_obj.func.terms.keys
+            con_obj = JuMP.constraint_object(link)
 
-            # Get the variables from the constraint in the next_object
-            next_object_nodes = all_nodes(next_object)
-            last_object_nodes = all_nodes(last_object)
-
-            next_object_link_vars = [var for var in vars if JuMP.owner_model(var) in next_object_nodes]
-            last_object_link_vars = [var for var in vars if JuMP.owner_model(var) in last_object_nodes]
-
-            # Get the optinodes containing the next set of variables
-            #next_optinode = optinode(next_object_vars[1]) #NEXT: Fix this!
+            vars, next_object_link_vars, last_object_link_vars = _get_con_obj_var_sets(con_obj, next_object_nodes, last_object_nodes)
 
             # Get the set of nodes in the next_object that are included in the constraint
+            if length(next_object_link_vars) == 0 || length(last_object_link_vars) == 0
+                error("link constraint does not connect nodes on upstream and/or downstream subgraphs " * 
+                    "This could be an error in modeling or a bug in the software"
+                )
+            end
             next_optinode = JuMP.owner_model(next_object_link_vars[1])
 
             # Map each complicating variable to the node where the
@@ -176,7 +170,7 @@ function _add_complicating_variables!(
 
 
     # Get the set of all complicating variables on last object
-    comp_var_map = Dict{NodeVariableRef, Int}()
+    comp_var_map = Dict{V, Int}()
 
     # Map complicating variables to their index
     for (i, var) in enumerate(comp_vars)
@@ -202,22 +196,15 @@ function _add_complicating_variables!(
     ############## Add constraints for complicating variables #####################
 
     # Define map from variable copies to their original variables
-    var_copy_map = Dict{NodeVariableRef, NodeVariableRef}()
+    var_copy_map = Dict{V, V}()
 
     # Loop through the nodes and add a variable copy on each node
     for node in keys(node_to_var)
         node_comp_vars = node_to_var[node]
 
-        varref_copy = @variable(node, _comp_vars_copy[1:length(node_comp_vars)])
+        varref_copy = _build_comp_vars_copies(node, length(node_comp_vars))
 
-        for (i, var) in enumerate(node_comp_vars)
-            if JuMP.has_lower_bound(var)
-                JuMP.set_lower_bound(varref_copy[i], lower_bound(var))
-            end
-
-            if JuMP.has_upper_bound(var)
-                JuMP.set_upper_bound(varref_copy[i], upper_bound(var))
-            end
+        for (i, var) in enumerate(node_comp_vars) 
             var_copy_map[var] = varref_copy[i]
         end
     end
@@ -230,24 +217,23 @@ function _add_complicating_variables!(
     # link = linking constriants (requires linking)
     # Linking constraints are required for constraints in the subgraph that have
     # complicating variables on more than one node
-    con_to_node = Dict{ConstraintRef, Plasmo.OptiNode}()
-    node_to_con = Dict{Plasmo.OptiNode, Vector{ConstraintRef}}()
-    linking_to_node = Dict{ConstraintRef, Plasmo.OptiNode}()
-    node_to_linking = Dict{Plasmo.OptiNode, Vector{ConstraintRef}}()
+    con_to_node = Dict{ConstraintRef, N}()
+    node_to_con = Dict{N, Vector{ConstraintRef}}()
+    linking_to_node = Dict{ConstraintRef, N}()
+    node_to_linking = Dict{N, Vector{ConstraintRef}}()
 
     # Loop through the complicating edges; decide if a constraint on the edge
     # requires a normal or a linking constraint
     for (i, edge) in enumerate(complicating_edges)
+        # Get the variables from the constraint in the next_object
+        next_object_nodes = all_nodes(next_object)
+        last_object_nodes = all_nodes(last_object)
         for (j, link) in enumerate(all_constraints(edge))
-            con_obj = constraint_object(link)
-            vars = con_obj.func.terms.keys
+            con_obj = JuMP.constraint_object(link)
 
-            # Get the variables from the constraint in the next_object
-            next_object_nodes = all_nodes(next_object)
-            last_object_nodes = all_nodes(last_object)
+            
+            vars, next_object_link_vars, last_object_link_vars = _get_con_obj_var_sets(con_obj, next_object_nodes, last_object_nodes)
 
-            next_object_link_vars = [var for var in vars if JuMP.owner_model(var) in next_object_nodes]
-            last_object_link_vars = [var for var in vars if JuMP.owner_model(var) in last_object_nodes]
             next_object_copy_vars = [var_copy_map[var] for var in last_object_link_vars]
 
             # Get the set of nodes in the next_object that are included in the constraint
@@ -288,64 +274,33 @@ function _add_complicating_variables!(
         # Loop through nodes and add a normal constraint for constraints with complicating variables
         for node in keys(node_to_con)
             cons = node_to_con[node]
-            _add_slack_to_node(optimizer, next_object, node, length(cons), slack_penalty)
-
-            for (j, con) in enumerate(cons)
-                con_obj = constraint_object(con)
-                _add_constraint_to_subproblem!(con_obj, comp_vars, var_copy_map,
-                                              next_object, node, false; slack = true,
-                                              slack_up = node[:_slack_up][j],
-                                              slack_down = node[:_slack_down][j]
-                )
-            end
+            _add_constraint_set_to_subproblem!(optimizer, cons, next_object, node, comp_vars, var_copy_map, false, true)
         end
         # Loop through nodes and add a linking constraint for constraints with complicating variables
         for node in keys(node_to_linking)
-            links = node_to_linking[node]
-            _add_slack_to_node_for_links(optimizer, next_object, node, length(links), slack_penalty)
-
-            for (j, link) in enumerate(links)
-                con_obj = constraint_object(link)
-                _add_constraint_to_subproblem!(con_obj, comp_vars, var_copy_map,
-                                              next_object, node, true; slack = true,
-                                              slack_up = node[:_slack_up_link][j],
-                                              slack_down = node[:_slack_down_link][j]
-                )
-            end
+            cons = node_to_linking[node]
+            _add_constraint_set_to_subproblem!(optimizer, cons, next_object, node, comp_vars, var_copy_map, true, true)
         end
     else
         # Loop through nodes and add a normal constraint for constraints with complicating variables
         for node in keys(node_to_con)
             cons = node_to_con[node]
-            for (j, con) in enumerate(cons)
-                con_obj = constraint_object(con)
-                _add_constraint_to_subproblem!(con_obj, comp_vars, var_copy_map,
-                                               next_object, node, false
-                )
-            end
+            _add_constraint_set_to_subproblem!(optimizer, cons, next_object, node, comp_vars, var_copy_map, false, false)
         end
         # Loop through nodes and add a linking constraint for constraints with complicating variables
         for node in keys(node_to_linking)
             links = node_to_linking[node]
-            for (j, link) in enumerate(links)
-                con_obj = constraint_object(link)
-                _add_constraint_to_subproblem!(con_obj, comp_vars, var_copy_map,
-                                               next_object, node, true
-                )
-            end
+            _add_constraint_set_to_subproblem!(optimizer, links, next_object, node, comp_vars, var_copy_map, true, false)
         end
     end
 end
 
 function _add_next_object!(
-    optimizer::BendersAlgorithm{Plasmo.OptiGraph},
-    last_object::Plasmo.OptiGraph,
-    next_object::Plasmo.OptiGraph,
+    optimizer::BendersAlgorithm{T, V},
+    last_object::T,
+    next_object::T,
     relaxed::Bool
-)
-    # Get the nodes from the last and next objects
-    next_object_nodes = all_nodes(next_object)
-    last_object_nodes = all_nodes(last_object)
+) where {T <: Plasmo.AbstractOptiGraph, V <: JuMP.AbstractVariableRef}
 
     # Get the map from node to graph
     node_to_graph = optimizer.ext["node_to_graph"]
@@ -357,7 +312,7 @@ function _add_next_object!(
     # Get the edges that are incident to next object but not connected to last object
     next_object_edge_diff = setdiff(next_object_incident_edges, last_object_incident_edges)
 
-    next_graphs = Plasmo.OptiGraph[]
+    next_graphs = Vector{T}()
 
     # Loop through the edges and get the subgraphs they map to
     for (i, edge) in enumerate(next_object_edge_diff)
@@ -379,7 +334,6 @@ function _add_next_object!(
     ############# Add Cost-to-Go Variable #################
     # Add cost-to-go variable and add to objective function
     _add_cost_to_go!(optimizer, next_object, relaxed)
-    #Plasmo._init_graph_backend(optimizer.graph)
 
     for g in next_graphs
         if g in optimizer.solve_order

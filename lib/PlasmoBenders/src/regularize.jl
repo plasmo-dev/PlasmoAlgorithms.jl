@@ -22,7 +22,7 @@ end
 
 function _construct_regularize!(
     optimizer::BendersAlgorithm{T}
-) where {T <: Union{Plasmo.OptiGraph, Plasmo.OptiNode}}
+) where {T <: Union{Plasmo.OptiGraph, Plasmo.RemoteOptiGraph}}
     for (i, object) in enumerate(optimizer.solve_order)
         next_objects = optimizer.solve_order_dict[object]
         if length(next_objects) > 0
@@ -42,7 +42,7 @@ function _regularize_pass!(
     optimizer::BendersAlgorithm{T},
     object,
     ub
-) where {T <: Union{Plasmo.OptiGraph, Plasmo.OptiNode}}
+) where {T <: Union{Plasmo.OptiGraph, Plasmo.RemoteOptiGraph}}
     next_objects = optimizer.solve_order_dict[object]
     if length(next_objects) > 0
         original_objective = get_regularize_objective_function(optimizer)[object]
@@ -57,15 +57,19 @@ function _regularize_pass!(
             @linkconstraint(object, _reg_con, original_objective <= rhs)
         end
 
-        @objective(object, Min, 0 * all_variables(object)[1])
+        V = Plasmo.variable_type(optimizer.graph)
+        @objective(object, Min, GenericAffExpr{Float64, V}(0.0))
 
-        optimize!(object)
+        t_solve = @elapsed optimize!(object)
+        optimizer.time_root_problem_solve += t_solve
+
         if termination_status(object) != MOI.INFEASIBLE
-            ub[1] += value(object, original_objective) - _theta_value(optimizer, object)
-            get_regularize_ubs(optimizer)[object] = value(object, original_objective) - _theta_value(optimizer, object)
+            obj_val_minus_theta = value(object, original_objective) - _theta_value(optimizer, object)
+            ub[1] += obj_val_minus_theta
+            get_regularize_ubs(optimizer)[object] = obj_val_minus_theta
             for next_object in next_objects
                 comp_vars = optimizer.comp_vars[next_object]
-                last_primals = JuMP.value.(comp_vars)
+                last_primals = _get_variable_values(object, comp_vars)
 
                 old_primals = optimizer.primal_iters[next_object]
                 optimizer.primal_iters[next_object] = hcat(old_primals, last_primals)
@@ -89,8 +93,7 @@ function _regularize_pass!(
         end
 
         # Save the solutions
-        object_vars = JuMP.all_variables(object)
-        optimizer.last_solutions[object] = JuMP.value.(object_vars)
+        optimizer.last_solutions[object] = _get_object_last_solutions(object)
 
         @objective(object, Min, original_objective)
 
@@ -100,9 +103,10 @@ function _regularize_pass!(
         end
     else
         _add_to_upper_bound!(optimizer, object, ub)
-        get_regularize_ubs(optimizer)[object] = value(object, objective_function(object))
+        get_regularize_ubs(optimizer)[object] = JuMP.objective_value(object)
 
-        if !optimizer.is_MIP
+        if !optimizer.is_MIP #TODO: This can probably be moved to _save_forward_pass_solutions function; doesn't need to be here
+            # we could actually probably only call _regularize_pass! on the root problem
             next_duals = _get_next_duals(optimizer, object)
             dual_iters = optimizer.dual_iters[object]
             optimizer.dual_iters[object] = hcat(dual_iters, next_duals)
@@ -112,8 +116,7 @@ function _regularize_pass!(
         end
 
         # Save the solutions
-        object_vars = JuMP.all_variables(object)
-        optimizer.last_solutions[object] = JuMP.value.(object_vars)
+        optimizer.last_solutions[object] = _get_object_last_solutions(object)
     end
 end
 
@@ -132,4 +135,14 @@ function _init_regularize_bounds!(optimizer::BendersAlgorithm)
             get_regularize_ubs(optimizer)[parent_object] += get_regularize_ubs(optimizer)[object]
         end
     end
+end
+
+function MOI.delete(redge::RemoteEdgeRef, rcref::ConstraintRef)
+    rgraph = redge.remote_graph
+    f = @spawnat rgraph.worker begin
+        ledge = Plasmo._convert_remote_to_local(rgraph, redge)
+        cref = Plasmo._convert_remote_to_local(rgraph, rcref)
+        MOI.delete(ledge, cref)
+    end
+    return nothing
 end

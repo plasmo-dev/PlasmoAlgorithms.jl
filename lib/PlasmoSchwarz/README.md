@@ -1,5 +1,7 @@
 # PlasmoSchwarz.jl
 
+[![](https://img.shields.io/badge/docs-dev-blue.svg)](https://plasmo-dev.github.io/PlasmoAlgorithms.jl/schwarz/)
+
 ## Overview
 PlasmoSchwarz.jl implements overlapping Schwarz decomposition for graph-structured optimization problems using the algorithm outlined in this [paper](https://arxiv.org/abs/1810.00491) and in Chapter 6 of [this PhD thesis](https://asset.library.wisc.edu/1711.dl/V2UHW7KSFIKBQ8Q/R/file-e04b2.pdf).
 The package works with the graph-based algebraic modeling package [Plasmo.jl](https://github.com/plasmo-dev/Plasmo.jl) to formulate and solve problems.
