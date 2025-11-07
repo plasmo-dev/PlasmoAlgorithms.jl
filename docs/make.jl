@@ -60,6 +60,21 @@ tmp_src = mktempdir()
 mkpath(tmp_src)
 cp(joinpath(src_root, "index.md"), joinpath(tmp_src, "index.md"); force=true)
 
+# Include shared figures folder so relative image links work
+fig_src = joinpath(src_root, "figures")
+fig_dst = joinpath(tmp_src, "figures")
+if isdir(fig_src)
+    mkpath(fig_dst)
+    for (root, dirs, files) in walkdir(fig_src)
+        rel = replace(root, fig_src => "")
+        target_root = joinpath(fig_dst, rel)
+        mkpath(target_root)
+        for f in files
+            cp(joinpath(root, f), joinpath(target_root, f); force=true)
+        end
+    end
+end
+
 if doc_pkg == "PlasmoBenders"
     # Copy only PlasmoBenders pages directory
     src_dir = joinpath(src_root, "PlasmoBenders")
