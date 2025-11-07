@@ -62,17 +62,16 @@ jobs:
   docs-index:
     name: Docs (index)
     needs: [benders-docs, schwarz-docs]
-    if: github.event_name == 'push'
+    if: github.event_name == 'push' || github.event_name == 'pull_request'  # TODO: remove PR after testing
     permissions:
       contents: write
     runs-on: ubuntu-latest
     steps:
-      - name: Fetch gh-pages branch
-        run: |
-          git init
-          git remote add origin https://github.com/${{ github.repository }}.git
-          git fetch origin gh-pages || echo "gh-pages branch will be created"
-          git checkout -B gh-pages
+      - name: Checkout gh-pages branch
+        uses: actions/checkout@v4
+        with:
+          ref: gh-pages
+          fetch-depth: 1
       - name: Create dev index with links
         run: |
           mkdir -p dev
@@ -119,5 +118,10 @@ jobs:
             echo "No changes to commit"
           else
             git commit -m "Update docs dev index with links to benders and schwarz"
-            git push https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.git gh-pages
+            # Only push on push events (not PRs from forks which lack write perms)
+            if [ "${{ github.event_name }}" = "push" ]; then
+              git push https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.git gh-pages
+            else
+              echo "Skipping push on PR (testing mode)"
+            fi
           fi
