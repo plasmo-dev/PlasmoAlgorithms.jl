@@ -1,0 +1,2 @@
+var DOCUMENTER_CURRENT_VERSION = "schwarz";
+var DOCUMENTER_IS_DEV_VERSION = true;
