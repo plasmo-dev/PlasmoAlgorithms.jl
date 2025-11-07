@@ -3,6 +3,7 @@
 #  This source code is adapted from that of Plasmo.jl which can be found at https://github.com/plasmo-dev/Plasmo.jl/blob/main/docs/make.jl
 
 using Documenter, Plasmo, Suppressor, Graphs
+using Base: walkdir
 
 doc_pkg = get(ENV, "DOC_PKG", "PlasmoBenders")  # default to PlasmoBenders
 
@@ -50,11 +51,49 @@ pages_schwarz = [
 modules_sel = doc_pkg == "PlasmoBenders" ? [PlasmoBenders] : [PlasmoSchwarz]
 pages_sel = doc_pkg == "PlasmoBenders" ? pages_benders : pages_schwarz
 
+# Build in a filtered temporary source directory to avoid processing pages
+# of the other package when building docs for one package.
+src_root = joinpath(@__DIR__, "src")
+tmp_src = mktempdir()
+
+# Always include index.md
+mkpath(tmp_src)
+cp(joinpath(src_root, "index.md"), joinpath(tmp_src, "index.md"); force=true)
+
+if doc_pkg == "PlasmoBenders"
+    # Copy only PlasmoBenders pages directory
+    src_dir = joinpath(src_root, "PlasmoBenders")
+    dest_dir = joinpath(tmp_src, "PlasmoBenders")
+    mkpath(dest_dir)
+    for (root, dirs, files) in walkdir(src_dir)
+        rel = replace(root, src_dir => "")
+        target_root = joinpath(dest_dir, rel)
+        mkpath(target_root)
+        for f in files
+            cp(joinpath(root, f), joinpath(target_root, f); force=true)
+        end
+    end
+else
+    # Copy only PlasmoSchwarz pages directory
+    src_dir = joinpath(src_root, "PlasmoSchwarz")
+    dest_dir = joinpath(tmp_src, "PlasmoSchwarz")
+    mkpath(dest_dir)
+    for (root, dirs, files) in walkdir(src_dir)
+        rel = replace(root, src_dir => "")
+        target_root = joinpath(dest_dir, rel)
+        mkpath(target_root)
+        for f in files
+            cp(joinpath(root, f), joinpath(target_root, f); force=true)
+        end
+    end
+end
+
 makedocs(; 
     sitename="PlasmoAlgorithms.jl - $(doc_pkg)",
     modules=modules_sel,
     doctest=true,
     checkdocs=:export,
+    source=tmp_src,
     format=Documenter.HTML(; prettyurls=get(ENV, "CI", nothing) == "true"),
     authors="Jordan Jalving and David Cole",
     pages=pages_sel,
