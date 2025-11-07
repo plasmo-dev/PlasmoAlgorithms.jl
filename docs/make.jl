@@ -109,7 +109,7 @@ makedocs(;
     doctest=true,
     checkdocs=:export,
     source=tmp_src,
-    format=Documenter.HTML(; prettyurls=get(ENV, "CI", nothing) == "true"),
+    format=Documenter.HTML(; prettyurls=get(ENV, "CI", nothing) == "true", edit_link = nothing),
     authors="Jordan Jalving and David Cole",
     pages=pages_sel,
 )
