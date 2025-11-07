@@ -62,15 +62,17 @@ jobs:
   docs-index:
     name: Docs (index)
     needs: [benders-docs, schwarz-docs]
+    if: github.event_name == 'push'
     permissions:
       contents: write
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout gh-pages
-        uses: actions/checkout@v4
-        with:
-          ref: gh-pages
-          fetch-depth: 0
+      - name: Fetch gh-pages branch
+        run: |
+          git init
+          git remote add origin https://github.com/${{ github.repository }}.git
+          git fetch origin gh-pages || echo "gh-pages branch will be created"
+          git checkout -B gh-pages
       - name: Create dev index with links
         run: |
           mkdir -p dev
@@ -107,6 +109,8 @@ jobs:
           </html>
           EOF
       - name: Commit and push index
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -115,5 +119,5 @@ jobs:
             echo "No changes to commit"
           else
             git commit -m "Update docs dev index with links to benders and schwarz"
-            git push origin gh-pages
+            git push https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.git gh-pages
           fi
