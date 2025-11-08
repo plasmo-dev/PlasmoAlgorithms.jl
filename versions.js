@@ -1,5 +1,5 @@
 var DOC_VERSIONS = [
-  "schwarz",
+  "dev",
 ];
-var DOCUMENTER_NEWEST = "schwarz";
-var DOCUMENTER_STABLE = "schwarz";
+var DOCUMENTER_NEWEST = "dev";
+var DOCUMENTER_STABLE = "dev";
