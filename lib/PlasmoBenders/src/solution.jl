@@ -107,7 +107,7 @@ function _optimize_in_forward_pass_multithread!(optimizer::BendersAlgorithm{Remo
         @async begin
             next_object = optimizer.solve_order[i]
 
-            is_feasible, obj_val, duals, t_solve = _optimize_remote_graph_forward(optimizer, next_object)
+            is_feasible, obj_val, duals, t_solve = _optimize_remote_graph_forward(optimizer, next_object, i)
             
             optimizer.time_subproblem_solves += t_solve
             if !is_feasible
@@ -131,10 +131,11 @@ function _optimize_in_forward_pass_multithread!(optimizer::BendersAlgorithm{Remo
     end
 end
 
-function _optimize_remote_graph_forward(optimizer::BendersAlgorithm, next_object::RemoteOptiGraph)
+function _optimize_remote_graph_forward(optimizer::BendersAlgorithm, next_object::RemoteOptiGraph, i::Int)
     feasibility_cuts = get_feasibility_cuts(optimizer)
     regularize = get_regularize(optimizer)
     add_slacks = get_add_slacks(optimizer)
+    is_MIP = get_is_MIP(optimizer)
 
     comp_vars = optimizer.comp_vars[next_object]
     var_copy_map = optimizer.var_copy_map[next_object]

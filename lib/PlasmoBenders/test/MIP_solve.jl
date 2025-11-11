@@ -130,6 +130,18 @@ module Test_MIP_solves
         run_algorithm!(BendersAlg)
         @test isapprox(BendersAlg.best_upper_bound, 5.8, rtol = 1e-6)
         @test isapprox(get_gap(BendersAlg), 0, rtol = 1e-6)
+        
+        gtest = build_graph()
+        BendersAlg = BendersAlgorithm(gtest, local_subgraphs(gtest)[2], max_iters = 20, multicut = true, regularize = false, parallelize_benders = false, strengthened = true);
+        run_algorithm!(BendersAlg)
+        @test isapprox(BendersAlg.best_upper_bound, 5.8, rtol = 1e-6)
+        @test isapprox(get_gap(BendersAlg), 0, rtol = 1e-6)
+
+        gtest = build_graph()
+        BendersAlg = BendersAlgorithm(gtest, local_subgraphs(gtest)[2], max_iters = 20, multicut = true, parallelize_benders = true, strengthened = true);
+        run_algorithm!(BendersAlg)
+        @test isapprox(BendersAlg.best_upper_bound, 5.8, rtol = 1e-6)
+        @test isapprox(get_gap(BendersAlg), 0, rtol = 1e-6)
 
         # RemoteOptiGraph
         gtest = build_remote_graph()
@@ -163,6 +175,18 @@ module Test_MIP_solves
         gtest = build_remote_graph()
         BendersAlg = BendersAlgorithm(gtest, local_subgraphs(gtest)[1], max_iters = 20, strengthened = true, multicut = true, regularize = false, parallelize_backward = true
         );
+        run_algorithm!(BendersAlg)
+        @test isapprox(BendersAlg.best_upper_bound, 5.8, rtol = 1e-6)
+        @test isapprox(get_gap(BendersAlg), 0, rtol = 1e-6)
+
+        gtest = build_remote_graph()
+        BendersAlg = BendersAlgorithm(gtest, local_subgraphs(gtest)[2], max_iters = 20, multicut = true, regularize = false, parallelize_benders = false, strengthened = true);
+        run_algorithm!(BendersAlg)
+        @test isapprox(BendersAlg.best_upper_bound, 5.8, rtol = 1e-6)
+        @test isapprox(get_gap(BendersAlg), 0, rtol = 1e-6)
+
+        gtest = build_remote_graph()
+        BendersAlg = BendersAlgorithm(gtest, local_subgraphs(gtest)[2], max_iters = 20, multicut = true, parallelize_benders = true, strengthened = true);
         run_algorithm!(BendersAlg)
         @test isapprox(BendersAlg.best_upper_bound, 5.8, rtol = 1e-6)
         @test isapprox(get_gap(BendersAlg), 0, rtol = 1e-6)

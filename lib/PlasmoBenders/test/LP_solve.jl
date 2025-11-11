@@ -158,6 +158,18 @@ function test_graphs()
     @test isapprox(BendersAlg.best_upper_bound, 5.5, rtol = 1e-6)
     @test isapprox(get_gap(BendersAlg), 0, rtol = 1e-6)
 
+    gtest = build_graph()
+    BendersAlg = BendersAlgorithm(gtest, local_subgraphs(gtest)[1], max_iters = 20, multicut = true, regularize = false, parallelize_benders = false);
+    run_algorithm!(BendersAlg)
+    @test isapprox(BendersAlg.best_upper_bound, 5.5, rtol = 1e-6)
+    @test isapprox(get_gap(BendersAlg), 0, rtol = 1e-6)
+
+    gtest = build_graph()
+    BendersAlg = BendersAlgorithm(gtest, local_subgraphs(gtest)[2], max_iters = 20, multicut = true, parallelize_benders = true);
+    run_algorithm!(BendersAlg)
+    @test isapprox(BendersAlg.best_upper_bound, 5.5, rtol = 1e-6)
+    @test isapprox(get_gap(BendersAlg), 0, rtol = 1e-6)
+
     # RemoteOptiGraphs
     gtest = build_remote_graph()
     BendersAlg = BendersAlgorithm(gtest, local_subgraphs(gtest)[1], max_iters = 20);
@@ -212,6 +224,18 @@ function test_graphs()
 
     gtest = build_remote_graph()
     BendersAlg = BendersAlgorithm(gtest, local_subgraphs(gtest)[1], max_iters = 20, multicut = true, regularize = false, parallelize_backward = true);
+    run_algorithm!(BendersAlg)
+    @test isapprox(BendersAlg.best_upper_bound, 5.5, rtol = 1e-6)
+    @test isapprox(get_gap(BendersAlg), 0, rtol = 1e-6)
+
+    gtest = build_remote_graph()
+    BendersAlg = BendersAlgorithm(gtest, local_subgraphs(gtest)[1], max_iters = 20, multicut = true, regularize = false, parallelize_benders = false);
+    run_algorithm!(BendersAlg)
+    @test isapprox(BendersAlg.best_upper_bound, 5.5, rtol = 1e-6)
+    @test isapprox(get_gap(BendersAlg), 0, rtol = 1e-6)
+
+    gtest = build_remote_graph()
+    BendersAlg = BendersAlgorithm(gtest, local_subgraphs(gtest)[2], max_iters = 20, multicut = true, parallelize_benders = true);
     run_algorithm!(BendersAlg)
     @test isapprox(BendersAlg.best_upper_bound, 5.5, rtol = 1e-6)
     @test isapprox(get_gap(BendersAlg), 0, rtol = 1e-6)
