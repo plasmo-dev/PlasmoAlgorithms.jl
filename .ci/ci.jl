@@ -36,24 +36,26 @@ resolved by Julia's package manager according to the package's compat bounds.
 function test_package(pkg::AbstractString)
 	envdir = joinpath(@__DIR__, "env-" * pkg)
 	_clean_env!(envdir)
+	t0 = time()
 
 	# Activate isolated env for this package
+	@info "[$(pkg)] Activating isolated environment" envdir=envdir timestamp=Dates.now()
 	Pkg.activate(envdir)
 
 	# Bring the target package into this environment in development mode
+	@info "[$(pkg)] Developing package from local path" timestamp=Dates.now()
 	Pkg.develop(PackageSpec(path = joinpath(@__DIR__, "..", "lib", pkg)))
 
-	# Resolve, build, and precompile before testing
+	# Resolve dependencies for this package.
+	# Avoid explicit build/precompile here because these phases can hang on some CI
+	# runners; `Pkg.test` will perform required build/precompile work as needed.
+	@info "[$(pkg)] Instantiating dependencies" timestamp=Dates.now()
+	ENV["JULIA_PKG_PRECOMPILE_AUTO"] = "0"
 	Pkg.instantiate()
-	Pkg.build()
-	try
-		Pkg.precompile()
-	catch err
-		@warn "Precompile failed; proceeding to tests" exception=(err, catch_backtrace())
-	end
 
-	@info "Running tests for $(pkg) (auto-resolved dependencies)" timestamp=Dates.now()
+	@info "[$(pkg)] Running tests" timestamp=Dates.now()
 	Pkg.test(pkg; coverage = true)
+	@info "[$(pkg)] Finished successfully" elapsed_seconds=round(time() - t0; digits=2) timestamp=Dates.now()
 end
 
 # Allow selection via environment variables for CI job splitting.
