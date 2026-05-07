@@ -40,8 +40,7 @@ end
 
 function _regularize_pass!(
     optimizer::BendersAlgorithm{T},
-    object,
-    ub
+    object::T
 ) where {T <: Union{Plasmo.OptiGraph, Plasmo.RemoteOptiGraph}}
     next_objects = optimizer.solve_order_dict[object]
     if length(next_objects) > 0
@@ -65,7 +64,7 @@ function _regularize_pass!(
 
         if termination_status(object) != MOI.INFEASIBLE
             obj_val_minus_theta = value(object, original_objective) - _theta_value(optimizer, object)
-            ub[1] += obj_val_minus_theta
+            optimizer.subgraph_objectives[object] = obj_val_minus_theta
             get_regularize_ubs(optimizer)[object] = obj_val_minus_theta
             for next_object in next_objects
                 comp_vars = optimizer.comp_vars[next_object]
@@ -102,7 +101,7 @@ function _regularize_pass!(
             delete!(object_dictionary(object), :_reg_con)
         end
     else
-        _add_to_upper_bound!(optimizer, object, ub)
+        _save_subproblem_objective!(optimizer, object)
         get_regularize_ubs(optimizer)[object] = JuMP.objective_value(object)
 
         if !optimizer.is_MIP #TODO: This can probably be moved to _save_forward_pass_solutions function; doesn't need to be here
