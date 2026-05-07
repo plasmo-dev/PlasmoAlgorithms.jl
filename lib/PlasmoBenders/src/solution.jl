@@ -115,7 +115,7 @@ function _optimize_in_forward_pass_multithread!(optimizer::BendersAlgorithm{Remo
             if !is_feasible
                 optimizer.subgraph_objectives[next_object] = Inf
             else
-                optimizer.subgraph_objectives[next_object] = obj_val
+                optimizer.subgraph_objectives[next_object] = obj_val # TODO: if we parallelize beyond two stages, we need to subtract the value of theta here
             end
 
             optimizer.feasibility_map[next_object] = is_feasible
