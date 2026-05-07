@@ -164,6 +164,7 @@ mutable struct BendersAlgorithm{T, V} <: AbstractPBAlgorithm{T, V}
     primal_iters::Dict{T, Matrix{Float64}}
     phis::Dict{T, Vector{Float64}}
     phis_LR::Dict{T, Vector{Float64}}
+    subgraph_objectives::Dict{T, Float64}
 
     time_forward_pass::Float64
     time_backward_pass::Float64
@@ -228,7 +229,8 @@ mutable struct BendersAlgorithm{T, V} <: AbstractPBAlgorithm{T, V}
         optimizer.primal_iters = Dict{T, Matrix{Float64}}()
         optimizer.phis = Dict{T, Vector{Float64}}()
         optimizer.phis_LR = Dict{T, Vector{Float64}}()
-
+        optimizer.subgraph_objectives = Dict{T, Float64}()
+        
         optimizer.time_forward_pass = 0.
         optimizer.time_backward_pass = 0.
         optimizer.time_init = 0.
@@ -720,9 +722,9 @@ function _forward_pass!(optimizer::BendersAlgorithm)
     if get_regularize(optimizer)
         get_regularize_lbs(optimizer)[root_object] = lb[1]
 
-        _regularize_pass!(optimizer, root_object, ub)
+        _regularize_pass!(optimizer, root_object)
     else
-        _add_to_upper_bound!(optimizer, root_object, ub)
+        _save_subproblem_objective!(optimizer, root_object)
         # Save primal information to upcoming objects
         next_objects = optimizer.solve_order_dict[root_object]
         for object in next_objects
@@ -736,6 +738,8 @@ function _forward_pass!(optimizer::BendersAlgorithm)
         # Save the solutions #FIX
         optimizer.last_solutions[root_object] = _get_object_last_solutions(root_object)
     end
+
+    ub[1] = optimizer.subgraph_objectives[root_object]
 
     ############# Solve each successive object #################
     if get_parallelize_benders(optimizer)

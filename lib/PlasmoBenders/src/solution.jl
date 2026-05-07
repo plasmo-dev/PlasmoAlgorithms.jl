@@ -96,8 +96,10 @@ end
 
 function _optimize_in_forward_pass_multithread!(optimizer::BendersAlgorithm{OptiGraph}, ub) #TODO: Type these functions
     Threads.@threads for i in 2:(length(optimizer.solve_order))
-        _forward_pass_iteration!(optimizer, i, ub)
+        _forward_pass_iteration!(optimizer, i)
     end
+    # sum the objective values from each thread and add to upper bound
+    ub[1] += sum(optimizer.subgraph_objectives[optimizer.solve_order[i]] for i in 2:(length(optimizer.solve_order)))
 end
 
 function _optimize_in_forward_pass_multithread!(optimizer::BendersAlgorithm{RemoteOptiGraph}, ub)
@@ -111,9 +113,9 @@ function _optimize_in_forward_pass_multithread!(optimizer::BendersAlgorithm{Remo
             
             optimizer.time_subproblem_solves += t_solve
             if !is_feasible
-                ub[1] = Inf
+                optimizer.subgraph_objectives[next_object] = Inf
             else
-                ub[1] += obj_val
+                optimizer.subgraph_objectives[next_object] = obj_val
             end
 
             optimizer.feasibility_map[next_object] = is_feasible
@@ -129,6 +131,8 @@ function _optimize_in_forward_pass_multithread!(optimizer::BendersAlgorithm{Remo
             end
         end
     end
+    # sum the objective values from each thread and add to upper bound
+    ub[1] += sum(optimizer.subgraph_objectives[optimizer.solve_order[i]] for i in 2:(length(optimizer.solve_order)))
 end
 
 function _optimize_remote_graph_forward(optimizer::BendersAlgorithm, next_object::RemoteOptiGraph, i::Int)
@@ -184,11 +188,13 @@ end
 
 function _optimize_in_forward_pass!(optimizer, ub) 
     for i in 2:(length(optimizer.solve_order))
-        _forward_pass_iteration!(optimizer, i, ub)
+        _forward_pass_iteration!(optimizer, i)
     end
+    # sum the objective values from each thread and add to upper bound
+    ub[1] += sum(optimizer.subgraph_objectives[optimizer.solve_order[i]] for i in 2:(length(optimizer.solve_order)))
 end
 
-function _forward_pass_iteration!(optimizer, i, ub)
+function _forward_pass_iteration!(optimizer, i)
     next_object = optimizer.solve_order[i]
 
     comp_vars = optimizer.comp_vars[next_object]
@@ -208,20 +214,21 @@ function _forward_pass_iteration!(optimizer, i, ub)
     object_termination_status = _check_termination_status(next_object, i; add_slacks_bool=get_add_slacks(optimizer), feasibility_cuts_bool=get_feasibility_cuts(optimizer))
 
     if object_termination_status
-        _save_forward_pass_solutions(optimizer, next_object, ub)
+        _save_forward_pass_solutions(optimizer, next_object)
         optimizer.feasibility_map[next_object] = true
     else
         # Need to do feasibility cuts; the check termination status function already tested
         # that feasibility_cuts was true
         println("Subgraph $i in forward pass was infeasible; using feasibility_cuts")
-        _save_feasibility_cut_data(optimizer, next_object, ub)
+        _save_feasibility_cut_data(optimizer, next_object)
+        optimizer.subgraph_objectives[next_object] = Inf
         optimizer.feasibility_map[next_object] = false
     end
 
     PlasmoBenders._unfix_variables(next_object, var_copies)
 end
 
-function _save_forward_pass_solutions(optimizer, next_object, ub)
+function _save_forward_pass_solutions(optimizer, next_object)
     # Add to the upper bound; if it's not the last object, subtract the cost-to-go from upper bound
     obj_val = JuMP.objective_value(next_object)
 
@@ -235,10 +242,10 @@ function _save_forward_pass_solutions(optimizer, next_object, ub)
     if get_regularize(optimizer)
         get_regularize_lbs(optimizer)[next_object] = obj_val
 
-        _regularize_pass!(optimizer, next_object, ub)
+        _regularize_pass!(optimizer, next_object)
     else
         # Save primal information to upcoming objects
-        _add_to_upper_bound!(optimizer, next_object, ub)
+        _save_subproblem_objective!(optimizer, next_object)
         next_objects = optimizer.solve_order_dict[next_object]
         for object in next_objects
             next_comp_vars = optimizer.comp_vars[object]
@@ -262,11 +269,9 @@ function _save_forward_pass_solutions(optimizer, next_object, ub)
     end
 end
 
-function _save_feasibility_cut_data(optimizer, next_object, ub)
+function _save_feasibility_cut_data(optimizer, next_object)
     # See JuMP documentation for implementation of this method:
     # https://jump.dev/JuMP.jl/stable/tutorials/algorithms/benders_decomposition/#Feasibility-cuts
-
-    ub[1] = Inf
 
     # Save primal information to upcoming objects
     if !optimizer.is_MIP
@@ -694,15 +699,15 @@ function _add_initial_relaxed_cuts!(
     optimizer.ext["link_var_mapping"] = link_vars_mapping
 end
 
-function _add_to_upper_bound!(
+function _save_subproblem_objective!(
     optimizer::BendersAlgorithm{T}, 
-    object::T, 
-    ub
+    object::T
 ) where {T <: Plasmo.AbstractOptiGraph}
     obj_val = JuMP.objective_value(object)
-    ub[1] += obj_val
     if length(optimizer.solve_order_dict[object]) > 0
         theta_val = _theta_value(optimizer, object)
-        ub[1] -= theta_val
+        optimizer.subgraph_objectives[object] = obj_val - theta_val
+    else
+        optimizer.subgraph_objectives[object] = obj_val
     end
 end
