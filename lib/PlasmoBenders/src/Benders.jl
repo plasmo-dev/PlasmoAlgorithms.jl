@@ -472,6 +472,7 @@ function BendersAlgorithm(
 
         # Add start object
         push!(optimizer.solve_order, root_object)
+        optimizer.subgraph_objectives[root_object] = 0.0
 
         _init_ext!(optimizer)
 
@@ -481,6 +482,7 @@ function BendersAlgorithm(
         while length(optimizer.ext["search_next"]) > 0
             search_next = optimizer.ext["search_next"][1]
             parent_object = optimizer.parent_objects[search_next]
+            optimizer.subgraph_objectives[search_next] = 0.0
             ############### Add complicating variables ##############
             # Get the linking constraints between last and current node
             _add_complicating_variables!(optimizer, parent_object, search_next, get_add_slacks(optimizer), get_slack_penalty(optimizer))
