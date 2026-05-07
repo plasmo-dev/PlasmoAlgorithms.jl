@@ -29,6 +29,8 @@ jobs:
       - name: Run tests (PlasmoBenders)
         env:
           PKG: PlasmoBenders
+          # Set 1 thread for macOS, 2 for others
+          JULIA_NUM_THREADS: ${{ matrix.os == 'macos-latest' && 1 || 2 }}
         run: julia --color=yes .ci/ci.jl
 
   schwarz:
@@ -48,4 +50,5 @@ jobs:
       - name: Run tests (PlasmoSchwarz)
         env:
           PKG: PlasmoSchwarz
+          JULIA_NUM_THREADS: 1
         run: julia --color=yes .ci/ci.jl
