@@ -15,6 +15,7 @@ jobs:
   benders:
     name: PlasmoBenders
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
@@ -36,6 +37,7 @@ jobs:
   schwarz:
     name: PlasmoSchwarz
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
